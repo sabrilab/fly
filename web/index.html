@@ -39,6 +39,10 @@
       <i>connectome FlyWire · modèle de Shiu et al. · corps flybody</i>
     </span>
   </div>
+  <div class="mode-switch" id="modeswitch" role="group" aria-label="Mode">
+    <button data-app="explore" class="on">Explorer</button>
+    <button data-app="sandbox">Bac à sable</button>
+  </div>
   <div class="topbar-stats" id="topstats"></div>
   <button id="btn-tour" class="ghost">Visite guidée</button>
   <button id="btn-about" class="ghost">À&nbsp;propos</button>
@@ -89,7 +93,42 @@
       </details>
     </section>
 
-    <section>
+    <section id="sec-sandbox" hidden>
+      <h2>Le monde <span class="badge">bac à sable</span></h2>
+      <p class="note">Posez des choses autour d'elle et regardez son cerveau réagir.
+        La boucle est complète : ce que vous mettez dans l'arène entre par ses capteurs,
+        traverse le connectome, et ressort en mouvement.</p>
+
+      <div class="tools" id="tools">
+        <button data-tool="sugar" class="on"><b>Sucre</b><i>clic au sol</i></button>
+        <button data-tool="bitter"><b>Amer</b><i>clic au sol</i></button>
+      </div>
+      <div class="actions">
+        <button data-act="threat" class="danger"><b>Menace</b><i>un objet fonce sur elle</i></button>
+        <button data-act="feed"><b>Sous ses pattes</b><i>pose la goutte devant elle</i></button>
+        <button data-act="dust"><b>Poussière</b><i>sur une antenne</i></button>
+        <button data-act="odor"><b>Odeur</b><i>nuage de géosmine</i></button>
+        <button data-act="clear" class="ghost"><b>Tout effacer</b><i>remet l'arène à zéro</i></button>
+      </div>
+
+      <p class="legend-hint">Elle n'a pas de navigation olfactive vers la nourriture dans ce
+        modèle : pour la voir manger, posez la goutte <b>sous ses pattes</b>, ou attendez
+        qu'elle tombe dessus en explorant.</p>
+      <label class="ctl inline switch"><input type="checkbox" id="sb-follow" checked>
+        <span>La caméra la suit</span></label>
+      <label class="ctl"><span>Pulsion d'exploration</span>
+        <input type="range" id="sb-explore" min="0" max="1" step="0.05" value="0.35"></label>
+      <p class="legend-hint">Son cerveau n'a <b>aucune activité spontanée</b> : sans cette
+        impulsion ajoutée à la main, elle resterait immobile pour toujours. C'est une des
+        limites du modèle, pas un choix esthétique.</p>
+
+      <div class="sb-stats" id="sb-stats"></div>
+      <p class="legend-hint">Le temps du monde avance au rythme du cerveau : une milliseconde
+        simulée dans le connectome = une milliseconde dans l'arène. Tout se passe donc au
+        ralenti — à peu près comme une mouche nous perçoit.</p>
+    </section>
+
+    <section id="sec-experiment">
       <h2>Expérience</h2>
       <select id="exp-select"></select>
       <p class="note" id="exp-note"></p>
@@ -120,7 +159,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="sec-live">
       <h2>Stimuler soi-même <span class="badge">live</span></h2>
       <p class="note">Le modèle tourne dans votre navigateur. Choisissez ce qu'on allume,
         à quelle intensité, et regardez le signal se propager pour de vrai.</p>
@@ -147,9 +186,16 @@
 <aside id="right" class="panel">
   <div class="panel-scroll">
 
-    <section>
+    <section id="sec-story">
       <h2>Ce qui se passe</h2>
       <div id="story" class="story"></div>
+    </section>
+
+    <section id="sec-caps" hidden>
+      <h2>Ce dont elle est capable</h2>
+      <p class="note">Ces capacités sont celles d'une vraie drosophile. Elles s'allument
+        ici quand le cerveau simulé les met effectivement en jeu.</p>
+      <div id="caps" class="caps"></div>
     </section>
 
     <section>
@@ -184,6 +230,16 @@
 
 <!-- bandeau de comportement -->
 <div id="behaviour"></div>
+
+<!-- ce que fait son cerveau, au-dessus de sa tête -->
+<div id="bubble" hidden><b id="bubble-line"></b><i id="bubble-sub"></i></div>
+
+<!-- ce qu'elle voit -->
+<div id="povbox" hidden>
+  <div class="pov-frame" id="pov-frame"></div>
+  <div class="pov-cap">Ce qu'elle voit · ~750 facettes par œil · elle est presque aveugle au rouge
+    <button id="pov-big" class="pov-btn">agrandir</button></div>
+</div>
 
 <!-- visite guidée -->
 <div id="tour" hidden>

@@ -23,7 +23,11 @@ let pending = 0;       // trames envoyées non acquittées
 
 function init(msg) {
   const n = G.indptr.length - 1;
-  const stim = Int32Array.from(msg.stim);
+  // msg.pops : { clé: [indices…] }. Chaque population a son taux, réglable en direct.
+  const pops = msg.pops || { main: msg.stim || [] };
+  const all = [];
+  for (const k in pops) for (const i of pops[k]) all.push(i);
+  const stim = Int32Array.from(new Set(all));
   const silenced = new Uint8Array(n);
   for (const i of msg.silence || []) silenced[i] = 1;
 
@@ -32,8 +36,9 @@ function init(msg) {
   for (const i of stim) { rfcSteps[i] = 0; isStim[i] = 1; }
 
   S = {
-    n, stim, silenced, isStim, rfcSteps,
-    prob: msg.hz * (DT / 1000),
+    n, stim, silenced, isStim, rfcSteps, pops,
+    prob: (msg.hz || 0) * (DT / 1000),
+    probs: new Float32Array(n),          // probabilité par neurone et par pas
     v: new Float32Array(n).fill(V_REST),
     g: new Float32Array(n),
     refrac: Int32Array.from(rfcSteps),
@@ -48,8 +53,25 @@ function init(msg) {
     firedBuf: new Int32Array(n),
     totalSpikes: 0,
     t0: performance.now(),
+    watch: Int32Array.from(msg.watch || []),   // neurones dont on veut le compte de décharges
   };
+  S.watchHits = new Int32Array(S.watch.length);
+  S.watchOf = new Int32Array(n).fill(-1);
+  S.watch.forEach((idx, k) => { S.watchOf[idx] = k; });
+  setRates(msg.rates || (msg.hz ? Object.fromEntries(Object.keys(pops).map((k) => [k, msg.hz])) : {}));
   for (const i of stim) wake(i);
+}
+
+/** Met à jour les taux de stimulation sans interrompre la simulation. */
+function setRates(rates) {
+  if (!S) return;
+  S.probs.fill(0);
+  for (const k in S.pops) {
+    const hz = rates[k] || 0;
+    if (hz <= 0) continue;
+    const p = hz * (DT / 1000);
+    for (const i of S.pops[k]) S.probs[i] = Math.max(S.probs[i], p);
+  }
 }
 
 function wake(i) {
@@ -78,9 +100,10 @@ function stepOnce() {
   }
 
   // --- 2. stimulation de Poisson (optogénétique virtuelle) ---
-  const amp = W_SYN * F_POI, prob = S.prob;
+  const amp = W_SYN * F_POI, probs = S.probs;
   for (let s = 0; s < S.stim.length; s++) {
-    if (Math.random() < prob) v[S.stim[s]] += amp;
+    const i = S.stim[s];
+    if (probs[i] > 0 && Math.random() < probs[i]) v[i] += amp;
   }
 
   // --- 3. mise à jour de l'ensemble éveillé ---
@@ -100,7 +123,11 @@ function stepOnce() {
     v[i] = vv;
     g[i] = fired ? 0 : gNew;
     spikes[i] = fired;
-    if (fired) { S.firedBuf[nFired++] = i; S.quiet[i] = 0; }
+    if (fired) {
+      S.firedBuf[nFired++] = i; S.quiet[i] = 0;
+      const w = S.watchOf[i];
+      if (w >= 0) S.watchHits[w]++;
+    }
 
     // le neurone reste-t-il éveillé ?
     const idle = !fired && Math.abs(vv - V_REST) < 1e-3 && Math.abs(g[i]) < 1e-4
@@ -135,9 +162,11 @@ function loop() {
   if (out.length) {
     pending += out.length;
     const elapsed = (performance.now() - S.t0) / 1000;
+    const hits = S.watchHits.slice();
+    S.watchHits.fill(0);
     postMessage({
       type: 'frames', frames: out, step: S.step,
-      awake: S.nAwake, total: S.totalSpikes,
+      awake: S.nAwake, total: S.totalSpikes, watch: hits, ms: out.length,
       rate: S.step * DT / 1000 / Math.max(1e-6, elapsed),   // s simulée / s réelle
     });
   }
@@ -152,6 +181,8 @@ onmessage = (e) => {
     postMessage({ type: 'ready', n: G.indptr.length - 1, nnz: G.indices.length });
   } else if (m.type === 'start') {
     init(m); running = true; pending = 0; S.nFired = 0; loop();
+  } else if (m.type === 'rates') {
+    setRates(m.rates);
   } else if (m.type === 'ack') {
     pending = Math.max(0, pending - m.count);
   } else if (m.type === 'stop') {

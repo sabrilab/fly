@@ -30,6 +30,56 @@ Ce n'est pas un « upload » : c'est un plan de câblage mis sous tension.
 
 ---
 
+## Le bac à sable : la boucle complète
+
+Un second mode où la mouche **vit**, dans une petite arène. La boucle est fermée pour de vrai :
+
+```
+monde → neurones sensoriels → cerveau LIF (Web Worker) → neurones descendants → corps → monde
+```
+
+Vous posez des choses autour d'elle et vous regardez son cerveau réagir :
+
+| Commande | Ce qui entre dans le cerveau | Ce qui en ressort |
+|---|---|---|
+| **Sucre** (clic au sol, ou sous ses pattes) | GRN sucrés au contact | MN9 → la trompe se déploie |
+| **Amer** par-dessus | GRN amers en plus | MN9 retombe à **0** — elle refuse |
+| **Menace** | LC4, proportionnel à la **vitesse d'expansion angulaire** | Giant Fiber → décollage |
+| **Poussière** | organe de Johnston | aDN1 → toilettage |
+| **Odeur** (géosmine) | Or56a | DNa02 → virage |
+
+Trois choses valent d'être signalées.
+
+**La latéralisation n'est pas écrite.** Les populations sensorielles sont séparées en moitié
+gauche et moitié droite, et stimulées séparément selon d'où vient le stimulus. L'asymétrie de
+la réponse motrice qui en résulte sort du connectome, pas d'une règle du contrôleur.
+
+**Le temps de réaction est mesuré, pas affiché en dur.** L'application chronomètre le délai
+entre le début de l'expansion visuelle et la première décharge de la fibre géante. Valeurs
+observées : **environ 110 ms**, dans la fourchette biologique de 20 à 200 ms.
+
+**Le temps du monde avance au rythme du cerveau.** Une milliseconde simulée dans le connectome
+= une milliseconde dans l'arène. Le cerveau tournant à ~0,5× le temps réel, tout se déroule au
+ralenti — à peu près comme une mouche nous perçoit.
+
+### Ce qu'elle voit
+
+Une incrustation montre la scène depuis sa tête, en très grand angle, ramenée à la trame
+hexagonale des ommatidies (~750 par œil) et corrigée pour sa réponse spectrale : elle voit
+l'ultraviolet, le bleu et le vert, et elle est presque aveugle au rouge.
+
+### La bulle au-dessus de sa tête
+
+Elle ne dit pas ce que la mouche « pense » — elle n'a rien à penser. Elle dit **ce que fait son
+cerveau**, avec les chiffres réels : « mes LC4 déchargent à 210 Hz », « MN9 est retombé à 0 Hz,
+ce blocage n'est écrit nulle part ». Y compris quand il ne fait rien : *« Rien n'entre. Mon
+cerveau n'a aucune activité spontanée : sans stimulus, il est parfaitement muet. »*
+
+C'est d'ailleurs pourquoi le bac à sable ajoute une **pulsion d'exploration** réglable : sans
+cette impulsion écrite à la main, la mouche resterait immobile pour toujours.
+
+---
+
 ## Ce que l'application permet
 
 - **Une visite guidée en 9 étapes**, sans jargon, qui part de « voici une mouche » et
@@ -186,6 +236,9 @@ web/                 l'application (statique, sans étape de build)
   js/scene.js          rendu Three.js du nuage de points
   js/fly-body.js       corps articulé, coque sombre translucide, recalage anatomique
   js/motor.js          neurones descendants -> articulations (animations assumées)
+  js/world.js          le bac à sable : arène, objets, sens, physique du vol
+  js/sandbox.js        boucle monde <-> cerveau, mesure du temps de réaction, narration
+  js/pov.js            ce qu'elle voit, à la résolution des ommatidies
   js/sim-worker.js     le même modèle LIF, en JavaScript, dans un Web Worker
   js/app.js            interface, lecture temporelle, sélection
   data/                binaires générés (24 Mo)

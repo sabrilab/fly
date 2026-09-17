@@ -3,6 +3,9 @@ import { BrainScene } from './scene.js';
 import { loadAtlas, loadSim, loadGraph, incomingOf, outgoingOf } from './data.js';
 import { loadBody } from './fly-body.js';
 import { MotorController, BEHAVIOURS } from './motor.js';
+import { World, ARENA } from './world.js';
+import { PovView } from './pov.js';
+import { Sandbox, splitBySide } from './sandbox.js';
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) => n.toLocaleString('fr-FR');
@@ -11,6 +14,8 @@ const SLOT = ['#3987e5', '#d95926', '#199e70', '#6b6a64'];
 let D, scene, body = null, motor = null;
 let sim = null, graph = null, worker = null;
 let picked = -1, playing = false, frame = 0, acc = 0, live = null;
+let appMode = 'explore', world = null, sandbox = null, pov = null, groundY = -1250;
+let tool = 'sugar', camSnap = true;
 let glowList = new Int32Array(200000), glowCount = 0;
 let viewMode = 'fly';
 
@@ -25,8 +30,12 @@ const step = (msg, p) => { stepEl.textContent = msg; fillEl.style.width = (p * 1
     scene = new BrainScene($('#view'), D);
     step('corps de la mouche (scan aux rayons X)…', 0.82);
     body = await loadBody();
-    scene.scene.add(body.root);
+    scene.flyGroup.add(body.root);
     motor = new MotorController(body);
+    // le sol se place sous le point le plus bas du corps, pattes comprises
+    scene.flyGroup.updateMatrixWorld(true);
+    groundY = new THREE.Box3().setFromObject(body.root).min.y;
+    pov = new PovView(); window.__pov = pov;
     window.__scene = scene; window.__body = body; window.__motor = motor;
     buildModes(); buildLegend(); buildExperiments(); buildReadouts(); buildLive(); buildStory();
     wireUI();
@@ -44,18 +53,107 @@ const step = (msg, p) => { stepEl.textContent = msg; fillEl.style.width = (p * 1
   }
 })();
 
+// ───────────────────────────── modes de l'application ─────────────────────────
+const EXPLORE_ONLY = ['#sec-experiment', '#sec-live', '#sec-story'];
+const SANDBOX_ONLY = ['#sec-sandbox', '#sec-caps'];
+
+async function setAppMode(name) {
+  if (name === appMode) return;
+  appMode = name;
+  document.querySelectorAll('#modeswitch button')
+    .forEach((b) => b.classList.toggle('on', b.dataset.app === name));
+  const sandboxOn = name === 'sandbox';
+  EXPLORE_ONLY.forEach((q) => { const e = $(q); if (e) e.hidden = sandboxOn; });
+  SANDBOX_ONLY.forEach((q) => { const e = $(q); if (e) e.hidden = !sandboxOn; });
+  $('#povbox').hidden = !sandboxOn;
+  $('#bubble').hidden = !sandboxOn;
+  $('#behaviour').classList.toggle('on', false);
+
+  if (sandboxOn) await enterSandbox();
+  else exitSandbox();
+}
+
+async function enterSandbox() {
+  stopLive(); setPlaying(false); clearGlow();
+  $('#sb-stats').innerHTML = 'chargement du réseau synaptique…';
+  const g = await ensureGraph();
+  ensureWorker(g);
+
+  if (!world) {
+    world = new World(scene.flyGroup);
+    scene.scene.add(world.group);
+    world.setGroundY(groundY);
+    world.addFood(7000, -9000, 'sugar');
+    world.addFood(-11000, 6000, 'bitter');
+  }
+  world.group.visible = true;
+  window.__world = world;
+  world.explore = +$('#sb-explore').value;
+
+  pov.enabled = true;
+  pov.attachTo(scene.flyGroup);
+
+  sandbox = new Sandbox({ world, motor, pov, readoutIndices: D.sims.readoutIndices });
+  sandbox.onRates = (r) => worker.postMessage({ type: 'rates', rates: r });
+
+  // populations séparées gauche / droite : la latéralisation de la réponse
+  // motrice doit sortir du connectome, pas d'une règle écrite ici
+  const pops = {};
+  const split = (key, name) => {
+    const { L, R } = splitBySide(D.sims.inputs[key].indices, D.side, D.atlas.side);
+    pops[name + 'L'] = L; pops[name + 'R'] = R;
+  };
+  split('sugar', 'sugar'); split('bitter', 'bitter');
+  split('jo', 'jo'); split('lc4', 'lc4');
+  pops.or56a = D.sims.inputs.or56a.indices;
+  pops.p9 = D.sims.inputs.p9.indices;
+
+  worker.postMessage({ type: 'start', pops, rates: { p9: world.explore * 100 },
+                       watch: Object.values(D.sims.readoutIndices) });
+  camSnap = true;
+  setViewMode('fly', true);
+  buildCaps();
+}
+
+function exitSandbox() {
+  if (worker) worker.postMessage({ type: 'stop' });
+  sandbox = null;
+  if (world) world.group.visible = false;
+  if (pov) { pov.enabled = false; pov.detach(); }
+  scene.flyGroup.position.set(0, 0, 0);
+  scene.flyGroup.rotation.set(0, 0, 0);
+  if (motor) { motor.flight = null; motor.reset(); }
+  clearGlow();
+  currentRates = {};
+  setViewMode('brain', false);
+}
+
+function ensureWorker(g) {
+  if (worker) return worker;
+  worker = new Worker('./js/sim-worker.js', { type: 'module' });
+  worker.onmessage = onWorker;
+  const cut = (a) => a.buffer.slice(a.byteOffset, a.byteOffset + a.byteLength);
+  worker.postMessage({ type: 'graph', indptr: cut(g.indptr), indices: cut(g.indices),
+                       weights: cut(g.weights) });
+  return worker;
+}
+
 // ───────────────────────────── échelle : mouche / tête / cerveau ──────────────
 const VIEWS = {
   fly:   { pos: [3400, 1900, -3400], target: [0, -320, 820], op: 1.0,  size: 1.9 },
   head:  { pos: [880, 430, -1020],   target: [0, -60, -60],  op: 1.0,  size: 2.1 },
   brain: { pos: [0, 55, 1180],       target: [0, 0, 0],      op: 0.18, size: 1.9 },
 };
+// dans le bac à sable la caméra suit la mouche : distance et hauteur par échelle
+const FOLLOW = { fly: [14000, 5600], head: [5000, 2000], brain: [2200, 950] };
 
 function setViewMode(name, instant) {
   viewMode = name;
   const v = VIEWS[name];
   document.querySelectorAll('#viewmode button')
     .forEach((b) => b.classList.toggle('on', b.dataset.vm === name));
+  if (appMode === 'sandbox') { camSnap = true; body.setOpacity(v.op); scene.setPointSize(v.size);
+                               $('#bodyop').value = v.op; $('#ptsize').value = v.size; return; }
   scene.flyToPose(v.pos, v.target, instant);
   $('#bodyop').value = v.op;
   body.setOpacity(v.op);
@@ -424,6 +522,42 @@ function updateStory() {
   bar.classList.toggle('shifted', !$('#tour').hidden);
 }
 
+// ───────────────────────────── capacités de la mouche ─────────────────────────
+function buildCaps() {
+  if (!sandbox) return;
+  $('#caps').innerHTML = sandbox.capabilities().map((c) =>
+    '<div class="cap" data-k="' + c.key + '"><i></i><b>' + c.label + '</b>' +
+    '<span>' + c.detail + '</span></div>').join('');
+}
+function updateCaps() {
+  if (!sandbox) return;
+  for (const c of sandbox.capabilities()) {
+    const el = document.querySelector('.cap[data-k="' + c.key + '"]');
+    if (!el) continue;
+    el.classList.toggle('on', c.on);
+    const sp = el.querySelector('span');
+    if (sp.textContent !== c.detail) sp.textContent = c.detail;
+  }
+}
+
+/** Place la bulle au-dessus de la tête de la mouche. */
+function placeBubble() {
+  const el = $('#bubble');
+  if (appMode !== 'sandbox' || !sandbox) { el.hidden = true; return; }
+  const n = sandbox.narrate();
+  $('#bubble-line').textContent = n.line;
+  $('#bubble-sub').textContent = n.sub;
+  el.className = n.tone;
+  const p = new THREE.Vector3(0, 1500, -900).applyMatrix4(scene.flyGroup.matrixWorld);
+  p.project(scene.camera);
+  if (p.z > 1) { el.hidden = true; return; }
+  const x = (p.x * 0.5 + 0.5) * innerWidth;
+  const y = (-p.y * 0.5 + 0.5) * innerHeight;
+  el.style.left = Math.max(180, Math.min(innerWidth - 180, x)) + 'px';
+  el.style.top = Math.max(120, y - 18) + 'px';
+  el.hidden = false;
+}
+
 // ───────────────────────────────── sélection ─────────────────────────────────
 async function selectNeuron(i, fly) {
   picked = i;
@@ -575,6 +709,10 @@ async function startLive() {
 
 function onWorker(e) {
   const m = e.data;
+  if (m.type === 'frames' && appMode === 'sandbox' && sandbox) {
+    sandbox.pushFrames(m.frames, m);
+    return;
+  }
   if (m.type === 'frames' && live) {
     for (const f of m.frames) live.queue.push(f);
     live.spikes = m.total; live.awake = m.awake;
@@ -641,7 +779,40 @@ function tick() {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  if (live) {
+  if (appMode === 'sandbox' && sandbox) {
+    const used = sandbox.step(26, (fired) => {
+      decayGlow($('#trail').checked ? 0.90 : 0.0);
+      for (const i of fired) addGlow(i);
+    });
+    if (used) {
+      worker.postMessage({ type: 'ack', count: used });
+      sandbox.wall += dt;
+      scene.commitActivity();
+      currentRates = sandbox.dn;
+      paintReadouts((nm) => sandbox.dn[nm] || 0);
+    }
+    motor.flight = { airborne: world.airborne, wingPhase: world.wingPhase };
+    if ($('#sb-follow').checked) {
+      const [dist, h] = FOLLOW[viewMode] || FOLLOW.fly;
+      scene.follow(new THREE.Vector3(world.pos.x, world.pos.y, world.pos.z),
+                   world.yaw, dist, h, dt, camSnap);
+      camSnap = false;
+    }
+    for (const ev of world.drainEvents()) {
+      if (ev.t === 'threat') flashHint('Une menace arrive.');
+      if (ev.t === 'takeoff') flashHint('Décollage.');
+    }
+    updateCaps();
+    if (used) {
+      const speed = sandbox.wall ? (sandbox.brainMs / 1000 / sandbox.wall) : 0;
+      $('#sb-stats').innerHTML =
+        '<b>' + fmt(sandbox.brainMs) + '</b> ms vécues · <b>' + fmt(sandbox.spikes) +
+        '</b> décharges · <b>' + fmt(sandbox.awake || 0) + '</b> neurones éveillés<br>' +
+        'temps mouche : <b>' + speed.toFixed(2) + '×</b> le temps réel' +
+        (sandbox.reaction !== null
+          ? ' · réaction mesurée : <b>' + sandbox.reaction + ' ms</b>' : '');
+    }
+  } else if (live) {
     let k = 0;
     while (live.queue.length && k < 20) {
       decayGlow($('#trail').checked ? 0.90 : 0.0);
@@ -683,9 +854,33 @@ function tick() {
   if (motor) { motor.enabled = $('#animate').checked; motor.update(currentRates, dt); }
 
   storyClock += dt;
-  if (storyClock > 0.12) { storyClock = 0; updateStory(); }
+  if (storyClock > 0.12) {
+    storyClock = 0;
+    if (appMode === 'sandbox') placeBubble(); else updateStory();
+  }
 
   scene.render(dt);
+
+  // ce qu'elle voit : rendu après la scène, dans un coin de l'écran
+  if (pov && pov.enabled && appMode === 'sandbox') {
+    const r = $('#pov-frame').getBoundingClientRect();
+    if (r.width > 8) {
+      // three.js applique lui-même le ratio de pixels : on donne des pixels CSS
+      pov.render(scene.renderer, scene.scene, {
+        x: Math.round(r.left), y: Math.round(innerHeight - r.bottom),
+        w: Math.round(r.width), h: Math.round(r.height),
+      }, [body.root, scene.base, scene.glow, scene.ring, scene.lines]);
+    }
+  }
+}
+
+let hintTimer = 0;
+function flashHint(msg) {
+  const el = $('#behaviour');
+  el.innerHTML = '<span class="dot"></span><b>' + msg + '</b>';
+  el.classList.add('on');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => el.classList.remove('on'), 2200);
 }
 
 // ───────────────────────────────── interface ─────────────────────────────────
@@ -725,6 +920,40 @@ function wireUI() {
   $('#btn-live-stop').onclick = () => { stopLive(); $('#live-stats').innerHTML = 'arrêtée.'; };
   $('#search').oninput = (e) => doSearch(e.target.value);
 
+  $('#modeswitch').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    setAppMode(b.dataset.app);
+  };
+  $('#tools').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    tool = b.dataset.tool;
+    document.querySelectorAll('#tools button').forEach((x) => x.classList.toggle('on', x === b));
+  };
+  $('.actions').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b || !world) return;
+    const act = b.dataset.act;
+    if (act === 'threat') world.launchThreat();
+    if (act === 'feed') { world.dropUnderFly(tool);
+      flashHint(tool === 'sugar' ? 'Goutte de sucre sous ses pattes.' : 'Goutte amère sous ses pattes.'); }
+    if (act === 'dust') world.puffDust();
+    if (act === 'odor') { const on = !world.odor; world.setOdor(on); b.classList.toggle('on', on); }
+    if (act === 'clear') {
+      world.clear();
+      document.querySelector('.actions button[data-act="odor"]').classList.remove('on');
+      camSnap = true;
+    }
+  };
+  $('#sb-explore').oninput = (e) => {
+    if (!world) return;
+    world.explore = +e.target.value;
+    if (sandbox) sandbox.lastRates.p9 = world.explore * 100;
+  };
+  $('#pov-big').onclick = () => {
+    const box = $('#povbox');
+    box.classList.toggle('wide');
+    $('#pov-big').textContent = box.classList.contains('wide') ? 'réduire' : 'agrandir';
+  };
+
   $('#btn-tour').onclick = () => startTour();
   $('#tour-next').onclick = () => (tourIdx === TOUR.length - 1 ? closeTour() : nextTour(1));
   $('#tour-prev').onclick = () => nextTour(-1);
@@ -738,6 +967,21 @@ function wireUI() {
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     down = null;
     if (moved > 5 || e.button !== 0) return;
+    if (appMode === 'sandbox' && world) {
+      const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1,
+                                    -(e.clientY / innerHeight) * 2 + 1);
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(ndc, scene.camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -groundY);
+      const hit = new THREE.Vector3();
+      if (ray.ray.intersectPlane(plane, hit)) {
+        const lim = ARENA / 2 - 1500;
+        world.addFood(Math.max(-lim, Math.min(lim, hit.x)),
+                      Math.max(-lim, Math.min(lim, hit.z)), tool);
+        flashHint(tool === 'sugar' ? 'Goutte de sucre posée.' : 'Goutte amère posée.');
+      }
+      return;
+    }
     const i = scene.pick(e.clientX, e.clientY);
     if (i >= 0) selectNeuron(i, false);
     else { scene.select(-1); scene.hideConnections(); }
@@ -776,6 +1020,10 @@ function wireUI() {
     if (e.target.matches('input, select, textarea')) return;
     if (e.code === 'Space') { e.preventDefault(); stopLive(); setPlaying(!playing); }
     if (e.key === 'r') { stopLive(); gotoFrame(0, true); }
+    if (appMode === 'sandbox' && world) {
+      if (e.key === 'm') world.launchThreat();
+      if (e.key === 'p') world.puffDust();
+    }
     if (!$('#tour').hidden) {
       if (e.key === 'ArrowRight') nextTour(1);
       if (e.key === 'ArrowLeft') nextTour(-1);

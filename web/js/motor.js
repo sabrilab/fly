@@ -46,6 +46,7 @@ export class MotorController {
     this.t = 0;
     this.escapeEnv = 0;
     this.enabled = true;
+    this.flight = null;      // { airborne, wingPhase } fourni par le bac à sable
     this.ref = new Map();
     for (const [name, j] of bodyModel.joints) this.ref.set(name, j.ref);
   }
@@ -114,6 +115,25 @@ export class MotorController {
       this.to('rostrum', this.ref.get('rostrum'), 1);
       this.to('haustellum', this.ref.get('haustellum'), 1);
       this.to('head', 0, 1);
+    }
+
+    // ── EN VOL : les ailes battent et les pattes se replient ────────────────
+    // Une vraie mouche bat des ailes 200 fois par seconde. Même au ralenti, c'est
+    // trop rapide pour un écran : on affiche un battement lisible, pas le vrai.
+    if (this.flight && this.flight.airborne) {
+      const beat = Math.sin(this.flight.wingPhase * 6.0);
+      for (const s of ['left', 'right']) {
+        this.to('wing_yaw_' + s, -0.45, 1);
+        this.to('wing_roll_' + s, -0.15 + 0.85 * beat, 1);
+        this.to('wing_pitch_' + s, 0.45 + 0.75 * beat, 1);
+        for (const seg of ['T1', 'T2', 'T3']) {
+          const leg = seg + '_' + s;
+          this.to('coxa_' + leg, 0.15, 0.8);
+          this.to('femur_' + leg, 1.35, 0.8);
+          this.to('tibia_' + leg, -1.15, 0.8);
+        }
+      }
+      return;
     }
 
     // ── FUIR : les ailes s'ouvrent, les pattes arrière détendent ─────────────

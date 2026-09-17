@@ -127,7 +127,12 @@ export class BrainScene {
       blending: THREE.NormalBlending,
     }));
     this.base.frustumCulled = false;
-    this.scene.add(this.base);
+    // tout ce qui appartient à la mouche vit dans ce groupe : dans le bac à sable,
+    // c'est lui qu'on déplace, cerveau et corps ensemble
+    this.flyGroup = new THREE.Group();
+    this.flyGroup.name = 'fly';
+    this.scene.add(this.flyGroup);
+    this.flyGroup.add(this.base);
 
     const glowUniforms = Object.assign({}, this.uniforms, {
       uSize: { value: 3.0 }, uActBoost: { value: 2.6 },
@@ -139,7 +144,7 @@ export class BrainScene {
       blending: THREE.AdditiveBlending,
     }));
     this.glow.frustumCulled = false;
-    this.scene.add(this.glow);
+    this.flyGroup.add(this.glow);
 
     // ---- connexions du neurone sélectionné ----
     const lg = new THREE.BufferGeometry();
@@ -151,7 +156,7 @@ export class BrainScene {
     }));
     this.lines.frustumCulled = false;
     this.lines.visible = false;
-    this.scene.add(this.lines);
+    this.flyGroup.add(this.lines);
 
     // ---- anneau de sélection ----
     const rg = new THREE.BufferGeometry();
@@ -164,7 +169,7 @@ export class BrainScene {
     }));
     this.ring.frustumCulled = false;
     this.ring.visible = false;
-    this.scene.add(this.ring);
+    this.flyGroup.add(this.ring);
 
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -195,8 +200,10 @@ export class BrainScene {
     const mx = (clientX / this._w) * 2 - 1;
     const my = -(clientY / this._h) * 2 + 1;
     this.camera.updateMatrixWorld();
+    this.flyGroup.updateMatrixWorld();
     const m = new THREE.Matrix4()
-      .multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements;
+      .multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse)
+      .multiply(this.flyGroup.matrixWorld).elements;
     const pos = this.data.positions, vis = this.aVis.array;
     const rx = (radiusPx / this._w) * 2, ry = (radiusPx / this._h) * 2;
     let best = -1, bestDepth = Infinity;
@@ -280,6 +287,20 @@ export class BrainScene {
     this._fly = { from: this.controls.target.clone(), to: new THREE.Vector3(0, 0, 0),
                   fromPos: this.camera.position.clone(),
                   toPos: new THREE.Vector3(p[0], p[1], p[2]), t: 0 };
+  }
+
+  /** Suit la mouche : la caméra reste derrière elle, en douceur. */
+  follow(target, yaw, dist, height, dt, snap) {
+    const wanted = new THREE.Vector3(
+      target.x + Math.sin(yaw) * dist,
+      target.y + height,
+      target.z + Math.cos(yaw) * dist,
+    );
+    const look = new THREE.Vector3(target.x, target.y + 900, target.z);
+    const k = snap ? 1 : Math.min(1, dt * 2.6);
+    this.camera.position.lerp(wanted, k);
+    this.controls.target.lerp(look, Math.min(1, dt * 4.5));
+    this._fly = null;
   }
 
   render(dt) {
