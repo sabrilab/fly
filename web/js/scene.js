@@ -290,16 +290,19 @@ export class BrainScene {
   }
 
   /** Suit la mouche : la caméra reste derrière elle, en douceur. */
-  follow(target, yaw, dist, height, dt, snap) {
+  follow(target, yaw, dist, height, dt, snap, fast) {
+    this._followFast = fast;
     const wanted = new THREE.Vector3(
       target.x + Math.sin(yaw) * dist,
       target.y + height,
       target.z + Math.cos(yaw) * dist,
     );
     const look = new THREE.Vector3(target.x, target.y + 900, target.z);
-    const k = snap ? 1 : Math.min(1, dt * 2.6);
+    // en vol la mouche est rapide : la caméra doit se raidir pour ne pas la perdre
+    const agile = this._followFast ? 7.5 : 2.6;
+    const k = snap ? 1 : Math.min(1, dt * agile);
     this.camera.position.lerp(wanted, k);
-    this.controls.target.lerp(look, Math.min(1, dt * 4.5));
+    this.controls.target.lerp(look, snap ? 1 : Math.min(1, dt * agile * 1.8));
     this._fly = null;
   }
 

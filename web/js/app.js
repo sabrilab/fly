@@ -795,7 +795,7 @@ function tick() {
     if ($('#sb-follow').checked) {
       const [dist, h] = FOLLOW[viewMode] || FOLLOW.fly;
       scene.follow(new THREE.Vector3(world.pos.x, world.pos.y, world.pos.z),
-                   world.yaw, dist, h, dt, camSnap);
+                   world.yaw, dist, h + world.pos.y * 0.25, dt, camSnap, world.airborne);
       camSnap = false;
     }
     for (const ev of world.drainEvents()) {
