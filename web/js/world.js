@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 
 // Le monde est en micromètres, comme le cerveau et le corps. La mouche fait 3 mm.
-export const ARENA = 46000;          // 46 mm de côté
+export const ARENA = 165000;         // 165 mm de côté, ≈ 55 longueurs de mouche
 const GROUND_FADE = 0.55;
 
 // Vitesses réelles de Drosophila, converties en µm par milliseconde.
@@ -24,6 +24,7 @@ const FLIGHT_V = 320;                // 0,32 m/s en vol
 const GRAVITY  = 9.81e-3 * 1000;     // µm/ms²
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const a_gf = (gf) => clamp(gf / 60, 0, 1);
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class World {
@@ -46,6 +47,14 @@ export class World {
     this.wingPhase = 0;
     this.lastLoom = new Map();
     this.explore = 0.35;                       // pulsion d'exploration ajoutée (voir plus bas)
+    this.wander = 0;                           // dérive lente de l'asymétrie gauche/droite
+    this.predator = false;
+    this.predatorT = 0;
+    this.takeoffs = 0;
+    // quelles populations sensorielles sont réellement séparées gauche/droite.
+    // Plusieurs listes de Shiu et al. sont entièrement d'un seul côté : on ne
+    // prétend pas latéraliser ce qui ne l'est pas.
+    this.lateral = {};
     this.events = [];
 
     this.buildScenery();
@@ -83,19 +92,26 @@ export class World {
 
     // brins d'herbe : des repères verticaux. Ils donnent du relief à la scène et,
     // surtout, un défilement visible dans sa vision quand elle avance.
-    const stems = new THREE.Group();
-    for (let i = 0; i < 130; i++) {
-      const h = rnd(1800, 6200);
-      const m = new THREE.Mesh(
-        new THREE.CylinderGeometry(rnd(60, 150), rnd(120, 260), h, 5, 1, true),
-        new THREE.MeshBasicMaterial({ color: 0x2a333d, transparent: true, opacity: 0.88,
-                                      side: THREE.DoubleSide }),
-      );
-      const a = rnd(0, Math.PI * 2), d = rnd(9500, ARENA * 0.46);
-      m.position.set(Math.cos(a) * d, h / 2, Math.sin(a) * d);
-      m.rotation.z = rnd(-0.22, 0.22);
-      stems.add(m);
+    const N_STEMS = 900;
+    const stemGeo = new THREE.CylinderGeometry(110, 230, 1, 5, 1, true);
+    const stems = new THREE.InstancedMesh(
+      stemGeo,
+      new THREE.MeshBasicMaterial({ color: 0x2a333d, transparent: true, opacity: 0.88,
+                                    side: THREE.DoubleSide }),
+      N_STEMS,
+    );
+    const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    for (let i = 0; i < N_STEMS; i++) {
+      const h = rnd(1800, 7000);
+      const a = rnd(0, Math.PI * 2), d = Math.sqrt(Math.random()) * ARENA * 0.47;
+      e.set(0, rnd(0, Math.PI), rnd(-0.22, 0.22));
+      q.setFromEuler(e);
+      mtx.compose(new THREE.Vector3(Math.cos(a) * d, h / 2, Math.sin(a) * d), q,
+                  new THREE.Vector3(1, h, 1));
+      stems.setMatrixAt(i, mtx);
     }
+    stems.instanceMatrix.needsUpdate = true;
+    stems.frustumCulled = false;
     this.stems = stems;
     this.group.add(stems);
   }
@@ -103,7 +119,7 @@ export class World {
   buildGround() {
     const g = new THREE.BufferGeometry();
     const pts = [], cols = [];
-    const N = 24, s = ARENA / 2, step = ARENA / N;
+    const N = 44, s = ARENA / 2, step = ARENA / N;
     for (let i = 0; i <= N; i++) {
       const u = -s + i * step;
       for (const [a, b] of [[[u, -s], [u, s]], [[-s, u], [s, u]]]) {
@@ -141,7 +157,7 @@ export class World {
 
   // ─────────────────────────────── objets ───────────────────────────────
   addFood(x, z, type = 'sugar') {
-    const r = type === 'sugar' ? 1400 : 1250;
+    const r = type === 'sugar' ? 2600 : 2400;
     const color = type === 'sugar' ? 0xeb9b3a : 0x2f7a52;
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(r, 20, 14),
@@ -163,6 +179,7 @@ export class World {
 
   /** Une menace fonce sur la mouche depuis un côté. */
   launchThreat(angle) {
+    if (this.threats.length >= 2) return null;       // pas d'embouteillage de prédateurs
     const a = angle !== undefined ? angle : rnd(0, Math.PI * 2);
     const d = 26000;
     const r = 3400;
@@ -184,7 +201,7 @@ export class World {
     const target = this.pos.clone().setY(this.groundY + 700)
       .add(new THREE.Vector3(rnd(-1800, 1800), 0, rnd(-1800, 1800)));
     const dir = target.clone().sub(from).normalize();
-    const t = { mesh, r, vel: dir.multiplyScalar(19), life: 3200, hit: false };
+    const t = { mesh, r, speed: 22, vel: dir.multiplyScalar(22), life: 2400, hit: false };
     this.threats.push(t);
     this.events.push({ t: 'threat', at: performance.now() });
     return t;
@@ -269,16 +286,16 @@ export class World {
     // ── GOÛT : contact d'une patte ou de la trompe avec une goutte ──────────
     for (const f of this.foods) {
       const d = Math.hypot(f.x - mouth.x, f.z - mouth.z);
-      if (d < f.r + 900 && !this.airborne) {
+      if (d < f.r + 1400 && !this.airborne) {
         const side = this.sideOf(new THREE.Vector3(f.x, mouth.y, f.z));
-        const hz = 200 * clamp(1 - d / (f.r + 900), 0, 1);
+        const hz = 200 * clamp(1 - d / (f.r + 1400), 0, 1);
         if (f.type === 'sugar') {
-          r.sugarL = Math.max(r.sugarL, hz * (side < 0 ? 1 : 0.55));
-          r.sugarR = Math.max(r.sugarR, hz * (side > 0 ? 1 : 0.55));
-          f.eaten = Math.min(1, f.eaten + dtMs * 0.00022);
+          r.sugarL = Math.max(r.sugarL, hz * this.gain('sugar', side, -1));
+          r.sugarR = Math.max(r.sugarR, hz * this.gain('sugar', side, 1));
+          f.eaten = Math.min(1, f.eaten + dtMs * 0.00016);
         } else {
-          r.bitterL = Math.max(r.bitterL, hz * (side < 0 ? 1 : 0.55));
-          r.bitterR = Math.max(r.bitterR, hz * (side > 0 ? 1 : 0.55));
+          r.bitterL = Math.max(r.bitterL, hz * this.gain('bitter', side, -1));
+          r.bitterR = Math.max(r.bitterR, hz * this.gain('bitter', side, 1));
         }
       }
     }
@@ -296,15 +313,15 @@ export class World {
         const hz = clamp(dTheta * 210, 0, 280);
         const side = this.sideOf(t.mesh.position);
         // œil composé : champ de 360°, donc les deux yeux voient, mais inégalement
-        r.lc4L = Math.max(r.lc4L, hz * (side < 0 ? 1 : 0.35));
-        r.lc4R = Math.max(r.lc4R, hz * (side > 0 ? 1 : 0.35));
+        r.lc4L = Math.max(r.lc4L, hz * this.gain('lc4', side, -1));
+        r.lc4R = Math.max(r.lc4R, hz * this.gain('lc4', side, 1));
       }
       // ── PRESSION DE L'AIR : l'organe de Johnston sent le souffle qui précède ──
       if (d < 14000) {
         const push = clamp((14000 - d) / 14000, 0, 1) * clamp(t.vel.length() / 26, 0, 1);
         const side = this.sideOf(t.mesh.position);
-        r.joL = Math.max(r.joL, 300 * push * (side < 0 ? 1 : 0.5));
-        r.joR = Math.max(r.joR, 300 * push * (side > 0 ? 1 : 0.5));
+        r.joL = Math.max(r.joL, 300 * push * this.gain('jo', side, -1));
+        r.joR = Math.max(r.joR, 300 * push * this.gain('jo', side, 1));
       }
     }
 
@@ -325,8 +342,21 @@ export class World {
     // ── PULSION D'EXPLORATION (ajoutée, pas biologique) ─────────────────────
     // Le modèle n'a aucune activité spontanée : sans cette impulsion, la mouche
     // resterait parfaitement immobile pour toujours. C'est une de ses limites.
-    r.p9 = this.explore * 100;
+    //
+    // On la répartit inégalement entre le P9 gauche et le P9 droit, selon une
+    // dérive lente. Ces deux neurones sont bien l'un à gauche et l'autre à droite :
+    // c'est donc le connectome qui transforme ce déséquilibre en virage, pas une
+    // règle écrite ici. Sans cela elle marcherait éternellement en ligne droite.
+    const base = this.explore * 100;
+    r.p9L = base * (1 + this.wander * 0.95);
+    r.p9R = base * (1 - this.wander * 0.95);
     return r;
+  }
+
+  /** Gain appliqué à une moitié de population selon d'où vient le stimulus. */
+  gain(key, objSide, popSide) {
+    if (!this.lateral[key]) return 1;        // population non latéralisée : plein régime
+    return objSide === popSide ? 1 : 0.35;
   }
 
   /** −1 si l'objet est à gauche de la mouche, +1 s'il est à droite. */
@@ -351,9 +381,18 @@ export class World {
     const turnR = Math.max(g('DNa01_right'), g('DNa02_right')) / FULL;
     const gf = Math.max(g('GiantFiber_1'), g('GiantFiber_2'));
 
-    // virage : la différence gauche/droite vient du connectome, pas d'ici
+    // Virage commandé par le cerveau : la différence gauche/droite des DNa vient
+    // du connectome, pas d'ici.
     const turn = clamp(turnR - turnL, -1, 1);
     this.yaw += turn * TURN_MAX * dtMs;
+
+    // Errance ajoutée à la main, et il faut le dire : le déséquilibre entre ses
+    // deux P9 fait bien tourner le connectome, mais d'un seul côté — seul DNa02
+    // gauche répond. Elle ne pourrait donc que spiraler. La dérive ci-dessous lui
+    // rend les deux sens, au même titre que la vitesse et l'angle de virage sont
+    // eux aussi traduits à la main.
+    const busy = clamp(Math.abs(turn) * 2 + a_gf(gf), 0, 1);
+    this.yaw += this.wander * TURN_MAX * 0.30 * dtMs * (1 - busy);
 
     // ── décollage : la fibre géante déclenche le saut ──────────────────────
     if (gf > 28 && !this.airborne) {
@@ -361,6 +400,7 @@ export class World {
       this.flightT = 620;
       const away = this.escapeDirection();
       this.vel.set(away.x * FLIGHT_V * 0.55, JUMP_V, away.z * FLIGHT_V * 0.55);
+      this.takeoffs++;
       this.events.push({ t: 'takeoff', at: performance.now() });
     }
 
@@ -406,12 +446,18 @@ export class World {
       this.pitch += (0 - this.pitch) * clamp(dtMs / 120, 0, 1);
     }
 
-    // on reste dans l'arène
-    const lim = ARENA / 2 - 2500;
-    if (Math.abs(this.pos.x) > lim || Math.abs(this.pos.z) > lim) {
+    // bord de l'arène : elle s'en détourne progressivement, bien avant la paroi,
+    // au lieu de la longer indéfiniment
+    const lim = ARENA / 2 - 4000;
+    const soft = lim - 22000;
+    const far = Math.max(Math.abs(this.pos.x), Math.abs(this.pos.z));
+    if (far > soft) {
+      const urge = clamp((far - soft) / (lim - soft), 0, 1);
+      const inward = Math.atan2(this.pos.x, this.pos.z);     // cap vers le centre
+      let diff = ((inward - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      this.yaw += clamp(diff, -1, 1) * 0.0055 * urge * dtMs;
       this.pos.x = clamp(this.pos.x, -lim, lim);
       this.pos.z = clamp(this.pos.z, -lim, lim);
-      this.yaw += Math.PI * 0.012 * dtMs * 0.1;   // longe le bord
     }
 
     this.applyPose();
@@ -442,8 +488,28 @@ export class World {
 
   // ─────────────────────────────── physique ───────────────────────────────
   step(dtMs) {
+    // dérive lente de l'asymétrie d'exploration : un processus d'Ornstein-Uhlenbeck
+    this.wander += (-this.wander * 0.0022 + (Math.random() - 0.5) * 0.05) * dtMs;
+    this.wander = clamp(this.wander, -1, 1);
+
+    // prédateur : des menaces reviennent d'elles-mêmes, pour qu'elle vole souvent
+    if (this.predator) {
+      this.predatorT -= dtMs;
+      if (this.predatorT <= 0 && !this.airborne) {
+        this.launchThreat();
+        this.predatorT = rnd(1800, 4000);
+      }
+    }
+
     for (let i = this.threats.length - 1; i >= 0; i--) {
       const t = this.threats[i];
+      // elle marche vite : une menace en ligne droite la manquerait. Un vrai
+      // prédateur corrige sa trajectoire, donc celui-ci la suit.
+      const aim = this.pos.clone().setY(this.groundY + 700).sub(t.mesh.position);
+      if (aim.lengthSq() > 1) {
+        aim.normalize().multiplyScalar(t.speed);
+        t.vel.lerp(aim, clamp(dtMs / 260, 0, 1));
+      }
       t.mesh.position.addScaledVector(t.vel, dtMs);
       t.life -= dtMs;
       const d = t.mesh.position.distanceTo(this.pos);

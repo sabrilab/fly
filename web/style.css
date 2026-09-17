@@ -397,3 +397,31 @@ details.adv > summary:hover { color: var(--text-secondary); }
   .mode-switch { margin-left: 8px; }
   .mode-switch button { padding: 6px 9px; font-size: 11.5px; }
 }
+
+/* ───────────── commandes du bac à sable : une action par bouton ───────────── */
+.deeds { display: flex; flex-direction: column; gap: 4px; }
+.deed-head { margin: 10px 2px 3px; font: 500 10px var(--mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-muted); }
+.deed-head:first-child { margin-top: 2px; }
+.deeds button { display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 10px 11px; text-align: left; border-radius: 9px; }
+.deed-ico { flex: none; width: 22px; height: 22px; border-radius: 7px; margin-top: 1px;
+  background: var(--surface-3); position: relative; }
+.deed-ico::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; }
+.deed-ico.sugar::after   { background: var(--act-3); box-shadow: 0 0 8px var(--act-3); }
+.deed-ico.bitter::after  { background: #2f7a52; }
+.deed-ico.threat::after  { background: var(--cat-2); border-radius: 3px; }
+.deed-ico.predator::after{ background: transparent; border: 2px solid var(--cat-2); }
+.deed-ico.dust::after    { inset: 8px; background: var(--text-secondary); }
+.deed-ico.odor::after    { background: transparent; border: 2px dotted var(--cat-3); }
+.deed-ico.clear::after   { background: transparent; border: 2px solid var(--text-muted);
+  border-radius: 3px; }
+.deed-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.deed-txt b { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.deed-txt i { font-style: normal; font-size: 11.5px; line-height: 1.4; color: var(--text-secondary); }
+.deed-txt em { font-style: normal; font: 400 10px var(--mono); color: var(--text-muted); margin-top: 2px; }
+.deeds button:hover .deed-ico { background: #3a3a40; }
+.deeds button.on { background: color-mix(in srgb, var(--cat-2) 20%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--cat-2) 58%, transparent); }
+.deeds button.flash { background: color-mix(in srgb, var(--cat-1) 30%, var(--surface-2));
+  border-color: var(--cat-1); transition: background .35s, border-color .35s; }

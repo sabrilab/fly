@@ -42,17 +42,28 @@ Vous posez des choses autour d'elle et vous regardez son cerveau réagir :
 
 | Commande | Ce qui entre dans le cerveau | Ce qui en ressort |
 |---|---|---|
-| **Sucre** (clic au sol, ou sous ses pattes) | GRN sucrés au contact | MN9 → la trompe se déploie |
-| **Amer** par-dessus | GRN amers en plus | MN9 retombe à **0** — elle refuse |
-| **Menace** | LC4, proportionnel à la **vitesse d'expansion angulaire** | Giant Fiber → décollage |
-| **Poussière** | organe de Johnston | aDN1 → toilettage |
-| **Odeur** (géosmine) | Or56a | DNa02 → virage |
+| **Lui donner du sucre** | GRN sucrés au contact | MN9 → la trompe se déploie (mesuré : 100 Hz) |
+| **Y ajouter de l'amer** | GRN amers en plus | MN9 retombe à **0** — elle refuse |
+| **Lancer une menace** | LC4, proportionnel à la **vitesse d'expansion angulaire** | Giant Fiber → décollage |
+| **Laisser un prédateur** | des menaces qui la poursuivent et corrigent leur trajectoire | elle décolle régulièrement |
+| **Lui poser une poussière** | organe de Johnston | aDN1 → toilettage |
+| **Lâcher une odeur de moisi** | Or56a | DNa02 → virage |
+
+L'arène fait **165 mm**, soit environ 55 longueurs de mouche.
 
 Trois choses valent d'être signalées.
 
-**La latéralisation n'est pas écrite.** Les populations sensorielles sont séparées en moitié
-gauche et moitié droite, et stimulées séparément selon d'où vient le stimulus. L'asymétrie de
-la réponse motrice qui en résulte sort du connectome, pas d'une règle du contrôleur.
+**La latéralisation, là où elle existe.** Les populations sensorielles sont séparées en moitié
+gauche et moitié droite quand c'est possible, et stimulées séparément selon d'où vient le
+stimulus : l'asymétrie motrice qui en résulte sort alors du connectome. C'est le cas de **LC4**
+(54 neurones à gauche, 50 à droite) et des deux **P9**. Ce n'est en revanche **pas** le cas des
+GRN sucrés ni de l'organe de Johnston : les listes de Shiu et al. sont entièrement d'un seul
+côté, et le code ne prétend pas le contraire — il utilise alors la population entière.
+
+**Ce qui doit être ajouté à la main, et pourquoi.** Le déséquilibre entre le P9 gauche et le P9
+droit fait bien tourner le connectome — mais **d'un seul côté** : seul DNa02 gauche répond. Elle
+ne saurait donc que spiraler. L'errance dans les deux sens est ajoutée au contrôleur, au même
+titre que la traduction d'un taux de décharge en vitesse ou en angle de braquage.
 
 **Le temps de réaction est mesuré, pas affiché en dur.** L'application chronomètre le délai
 entre le début de l'expansion visuelle et la première décharge de la fibre géante. Valeurs

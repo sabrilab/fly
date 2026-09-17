@@ -94,38 +94,67 @@
     </section>
 
     <section id="sec-sandbox" hidden>
-      <h2>Le monde <span class="badge">bac à sable</span></h2>
-      <p class="note">Posez des choses autour d'elle et regardez son cerveau réagir.
-        La boucle est complète : ce que vous mettez dans l'arène entre par ses capteurs,
-        traverse le connectome, et ressort en mouvement.</p>
+      <h2>Agir sur elle <span class="badge">bac à sable</span></h2>
+      <p class="note">Chaque bouton met quelque chose dans son environnement. Elle n'obéit pas :
+        ce que vous posez entre par ses capteurs, traverse son cerveau, et ressort en mouvement.</p>
 
-      <div class="tools" id="tools">
-        <button data-tool="sugar" class="on"><b>Sucre</b><i>clic au sol</i></button>
-        <button data-tool="bitter"><b>Amer</b><i>clic au sol</i></button>
-      </div>
-      <div class="actions">
-        <button data-act="threat" class="danger"><b>Menace</b><i>un objet fonce sur elle</i></button>
-        <button data-act="feed"><b>Sous ses pattes</b><i>pose la goutte devant elle</i></button>
-        <button data-act="dust"><b>Poussière</b><i>sur une antenne</i></button>
-        <button data-act="odor"><b>Odeur</b><i>nuage de géosmine</i></button>
-        <button data-act="clear" class="ghost"><b>Tout effacer</b><i>remet l'arène à zéro</i></button>
+      <div class="deeds" id="deeds">
+        <div class="deed-head">La nourrir</div>
+        <button data-do="sugar">
+          <span class="deed-ico sugar"></span>
+          <span class="deed-txt"><b>Lui donner du sucre</b><i>elle déploie sa trompe et mange</i></span>
+        </button>
+        <button data-do="bitter">
+          <span class="deed-ico bitter"></span>
+          <span class="deed-txt"><b>Y ajouter de l'amer</b><i>elle refuse net : MN9 tombe à zéro</i></span>
+        </button>
+
+        <div class="deed-head">Lui faire peur</div>
+        <button data-do="threat">
+          <span class="deed-ico threat"></span>
+          <span class="deed-txt"><b>Lancer une menace</b><i>quelque chose fonce sur elle — elle décolle</i>
+            <em>touche M</em></span>
+        </button>
+        <button data-do="predator" class="togglable">
+          <span class="deed-ico predator"></span>
+          <span class="deed-txt"><b>Laisser un prédateur</b><i>les menaces reviennent toutes seules</i></span>
+        </button>
+
+        <div class="deed-head">La déranger</div>
+        <button data-do="dust">
+          <span class="deed-ico dust"></span>
+          <span class="deed-txt"><b>Lui poser une poussière</b><i>sur une antenne — elle se nettoie</i>
+            <em>touche P</em></span>
+        </button>
+        <button data-do="odor" class="togglable">
+          <span class="deed-ico odor"></span>
+          <span class="deed-txt"><b>Lâcher une odeur de moisi</b><i>de la géosmine — elle s'en écarte</i></span>
+        </button>
+
+        <div class="deed-head">Remettre à zéro</div>
+        <button data-do="clear">
+          <span class="deed-ico clear"></span>
+          <span class="deed-txt"><b>Tout enlever</b><i>l'arène redevient vide</i></span>
+        </button>
       </div>
 
-      <p class="legend-hint">Elle n'a pas de navigation olfactive vers la nourriture dans ce
-        modèle : pour la voir manger, posez la goutte <b>sous ses pattes</b>, ou attendez
-        qu'elle tombe dessus en explorant.</p>
+      <p class="legend-hint">Vous pouvez aussi <b>cliquer n'importe où au sol</b> pour poser une
+        goutte à cet endroit — du même type que la dernière que vous avez donnée.</p>
+
       <label class="ctl inline switch"><input type="checkbox" id="sb-follow" checked>
         <span>La caméra la suit</span></label>
-      <label class="ctl"><span>Pulsion d'exploration</span>
+      <label class="ctl"><span>Envie de bouger</span>
         <input type="range" id="sb-explore" min="0" max="1" step="0.05" value="0.35"></label>
       <p class="legend-hint">Son cerveau n'a <b>aucune activité spontanée</b> : sans cette
-        impulsion ajoutée à la main, elle resterait immobile pour toujours. C'est une des
-        limites du modèle, pas un choix esthétique.</p>
+        impulsion ajoutée à la main, elle resterait immobile pour toujours. Elle est répartie
+        inégalement entre son P9 gauche et son P9 droit — et le connectome en fait bien un
+        virage, mais <b>d'un seul côté</b> : seul son DNa02 gauche répond. Elle ne saurait donc
+        que spiraler. L'errance dans les deux sens est ajoutée à la main, comme le sont déjà sa
+        vitesse et son angle de braquage.</p>
 
       <div class="sb-stats" id="sb-stats"></div>
-      <p class="legend-hint">Le temps du monde avance au rythme du cerveau : une milliseconde
-        simulée dans le connectome = une milliseconde dans l'arène. Tout se passe donc au
-        ralenti — à peu près comme une mouche nous perçoit.</p>
+      <p class="legend-hint">Le temps de l'arène avance au rythme de son cerveau. Comme il tourne
+        moins vite que le temps réel, tout se passe au ralenti — à peu près comme elle nous perçoit.</p>
     </section>
 
     <section id="sec-experiment">

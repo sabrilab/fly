@@ -145,12 +145,12 @@ function stepOnce() {
 
 function loop() {
   if (!running) return;
-  if (pending > 50) { setTimeout(loop, 8); return; }
+  if (pending > 140) { setTimeout(loop, 6); return; }
 
-  const budgetEnd = performance.now() + 12;   // ms de CPU par tranche
+  const budgetEnd = performance.now() + 15;   // ms de CPU par tranche
   let frames = 0;
   const out = [];
-  while (running && performance.now() < budgetEnd && frames < 24) {
+  while (running && performance.now() < budgetEnd && frames < 64) {
     const fired = [];
     for (let s = 0; s < STEPS_PER_FRAME; s++) {
       stepOnce();

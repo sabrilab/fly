@@ -69,6 +69,10 @@ async function setAppMode(name) {
   $('#bubble').hidden = !sandboxOn;
   $('#behaviour').classList.toggle('on', false);
 
+  const scroll = document.querySelector('#left .panel-scroll');
+  if (sandboxOn) scroll.prepend($('#sec-sandbox'));
+  else scroll.insertBefore($('#sec-sandbox'), $('#sec-experiment'));
+
   if (sandboxOn) await enterSandbox();
   else exitSandbox();
 }
@@ -94,21 +98,27 @@ async function enterSandbox() {
   pov.attachTo(scene.flyGroup);
 
   sandbox = new Sandbox({ world, motor, pov, readoutIndices: D.sims.readoutIndices });
+  window.__sandbox = () => sandbox;
   sandbox.onRates = (r) => worker.postMessage({ type: 'rates', rates: r });
 
   // populations séparées gauche / droite : la latéralisation de la réponse
   // motrice doit sortir du connectome, pas d'une règle écrite ici
   const pops = {};
-  const split = (key, name) => {
-    const { L, R } = splitBySide(D.sims.inputs[key].indices, D.side, D.atlas.side);
-    pops[name + 'L'] = L; pops[name + 'R'] = R;
+  const split = (key) => {
+    const all = D.sims.inputs[key].indices;
+    const { L, R } = splitBySide(all, D.side, D.atlas.side);
+    // certaines listes de Shiu et al. sont entièrement d'un seul côté : dans ce
+    // cas il n'y a rien à latéraliser, on garde la population entière des deux côtés
+    const lateral = L.length > 0 && R.length > 0;
+    world.lateral[key] = lateral;
+    pops[key + 'L'] = lateral ? L : all;
+    pops[key + 'R'] = lateral ? R : [];
   };
-  split('sugar', 'sugar'); split('bitter', 'bitter');
-  split('jo', 'jo'); split('lc4', 'lc4');
+  ['sugar', 'bitter', 'jo', 'lc4', 'p9'].forEach(split);
   pops.or56a = D.sims.inputs.or56a.indices;
-  pops.p9 = D.sims.inputs.p9.indices;
 
-  worker.postMessage({ type: 'start', pops, rates: { p9: world.explore * 100 },
+  worker.postMessage({ type: 'start', pops,
+                       rates: { p9L: world.explore * 100, p9R: world.explore * 100 },
                        watch: Object.values(D.sims.readoutIndices) });
   camSnap = true;
   setViewMode('fly', true);
@@ -776,17 +786,21 @@ let last = performance.now(), storyClock = 0;
 function tick() {
   requestAnimationFrame(tick);
   const now = performance.now();
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const rawDt = (now - last) / 1000;          // temps réel écoulé, non borné
+  const dt = Math.min(0.05, rawDt);           // borné pour la physique et les lissages
   last = now;
 
   if (appMode === 'sandbox' && sandbox) {
-    const used = sandbox.step(26, (fired) => {
+    // budget mesuré en temps, pas en images : si le rendu ralentit, le cerveau
+    // continue d'avancer au même rythme (le worker reste le seul vrai plafond)
+    const budget = Math.max(6, Math.min(220, Math.round(rawDt * 1000 * 0.65)));
+    const used = sandbox.step(budget, (fired) => {
       decayGlow($('#trail').checked ? 0.90 : 0.0);
       for (const i of fired) addGlow(i);
     });
     if (used) {
       worker.postMessage({ type: 'ack', count: used });
-      sandbox.wall += dt;
+      sandbox.wall += rawDt;   // temps réel, sinon la vitesse affichée est fausse
       scene.commitActivity();
       currentRates = sandbox.dn;
       paintReadouts((nm) => sandbox.dn[nm] || 0);
@@ -924,29 +938,34 @@ function wireUI() {
     const b = e.target.closest('button'); if (!b) return;
     setAppMode(b.dataset.app);
   };
-  $('#tools').onclick = (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    tool = b.dataset.tool;
-    document.querySelectorAll('#tools button').forEach((x) => x.classList.toggle('on', x === b));
-  };
-  $('.actions').onclick = (e) => {
+  $('#deeds').onclick = (e) => {
     const b = e.target.closest('button'); if (!b || !world) return;
-    const act = b.dataset.act;
-    if (act === 'threat') world.launchThreat();
-    if (act === 'feed') { world.dropUnderFly(tool);
-      flashHint(tool === 'sugar' ? 'Goutte de sucre sous ses pattes.' : 'Goutte amère sous ses pattes.'); }
-    if (act === 'dust') world.puffDust();
-    if (act === 'odor') { const on = !world.odor; world.setOdor(on); b.classList.toggle('on', on); }
-    if (act === 'clear') {
-      world.clear();
-      document.querySelector('.actions button[data-act="odor"]').classList.remove('on');
+    const act = b.dataset.do;
+    const flash = () => { b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 420); };
+    if (act === 'sugar' || act === 'bitter') {
+      tool = act; world.dropUnderFly(act); flash();
+      flashHint(act === 'sugar' ? 'Sucre posé devant elle.' : 'Amer posé devant elle.');
+    } else if (act === 'threat') { world.launchThreat(); flash(); }
+    else if (act === 'dust') { world.puffDust(); flash(); }
+    else if (act === 'predator') {
+      world.predator = !world.predator;
+      world.predatorT = world.predator ? 1500 : 0;
+      b.classList.toggle('on', world.predator);
+      flashHint(world.predator ? 'Un prédateur rôde.' : 'Le prédateur est parti.');
+    } else if (act === 'odor') {
+      const on = !world.odor; world.setOdor(on); b.classList.toggle('on', on);
+    } else if (act === 'clear') {
+      world.clear(); flash();
+      document.querySelectorAll('#deeds button.togglable').forEach((x) => x.classList.remove('on'));
+      world.predator = false;
       camSnap = true;
     }
   };
   $('#sb-explore').oninput = (e) => {
     if (!world) return;
     world.explore = +e.target.value;
-    if (sandbox) sandbox.lastRates.p9 = world.explore * 100;
+    if (sandbox) { sandbox.lastRates.p9L = world.explore * 100;
+                   sandbox.lastRates.p9R = world.explore * 100; }
   };
   $('#pov-big').onclick = () => {
     const box = $('#povbox');

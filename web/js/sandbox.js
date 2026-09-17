@@ -149,10 +149,16 @@ export class Sandbox {
       set('Je sens l’air bouger.',
           `organe de Johnston à ${Math.round(jo)} Hz — je perçois les variations de pression ` +
           'avant même de voir quoi que ce soit', 'busy');
-    } else if (bitter > 40 && mn9 < 5) {
-      set('C’est amer. Je n’avale pas.',
-          `MN9 est retombé à ${Math.round(mn9)} Hz. Ce blocage n’est écrit nulle part : ` +
-          'il sort de mon câblage', 'busy');
+    } else if (bitter > 40) {
+      if (mn9 < 12) {
+        set('C’est amer. Je n’avale pas.',
+            `MN9 est retombé à ${Math.round(mn9)} Hz. Ce blocage n’est écrit nulle part : ` +
+            'il sort de mon câblage', 'busy');
+      } else {
+        set('Il y a du sucre, mais aussi de l’amer.',
+            `les deux voies se disputent : MN9 n’arrive qu’à ${Math.round(mn9)} Hz au lieu de 100`,
+            'busy');
+      }
     } else if (mn9 > 10) {
       set('Du sucre.',
           `MN9 à ${Math.round(mn9)} Hz : ma trompe se déploie`, 'good');
@@ -167,6 +173,8 @@ export class Sandbox {
           `DNa à ${Math.round(dna)} Hz, P9 à ${Math.round(p9)} Hz`, 'calm');
     } else if (p9 > 8) {
       set('J’avance.', `P9 à ${Math.round(p9)} Hz — marche en trépied alterné`, 'calm');
+    } else if (w.airborne) {
+      set('Je retombe.', 'les ailes ne portent plus, j’atterris', 'busy');
     } else if (this.spikes === 0 || (!p9 && !mn9 && !adn && !gf)) {
       set('Rien n’entre. Je ne fais rien.',
           'mon cerveau n’a aucune activité spontanée : sans stimulus, il est parfaitement muet',
