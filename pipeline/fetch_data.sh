@@ -17,5 +17,12 @@ if [ ! -d raw/fly-brain ]; then
   git clone --depth 1 https://github.com/eonsystemspbc/fly-brain raw/fly-brain
 fi
 
+# 3. Corps de mouche : modèle MuJoCo de DeepMind / HHMI Janelia.
+if [ ! -d raw/flybody ]; then
+  echo "→ dépôt eonsystemspbc/flybody (≈ 160 Mo, maillages du corps)…"
+  git clone --depth 1 https://github.com/eonsystemspbc/flybody raw/flybody
+fi
+
 echo "OK. Lancez ensuite :"
 echo "  python build_atlas.py && python run_experiments.py && python build_edges.py"
+echo "  python build_body.py raw/flybody/flybody/fruitfly/assets"

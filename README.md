@@ -1,11 +1,11 @@
-# Cerveau de drosophile — connectome navigable et modèle exécutable
+# Le cerveau d'une mouche — dans son corps, et en marche
 
 Le **cerveau entier d'une mouche du vinaigre**, en 3D dans le navigateur : 138 639 neurones
-à leur vraie position anatomique, le modèle neuronal qui va avec, et de quoi lancer ses
-propres expériences.
+à leur vraie position anatomique, **logés dans le vrai corps de l'animal**, avec le modèle
+qui les fait fonctionner et de quoi lancer ses propres expériences.
 
 C'est le modèle repris par **Eon Systems** pour sa démo de « mouche incarnée » de mars 2026,
-remis à plat, vérifié, et rendu explorable.
+remis à plat, vérifié, et rendu explorable — limites comprises.
 
 ---
 
@@ -17,6 +17,7 @@ remis à plat, vérifié, et rendu explorable.
 | **Le signe** — chaque neurone est excitateur ou inhibiteur | prédiction de neurotransmetteur, Eckstein et al. |
 | **Les positions 3D et les types cellulaires** | annotations de Schlegel et al. 2024 |
 | **La dynamique** — intègre-et-tire à fuite (LIF) | **Shiu et al.**, *Nature* 2024 |
+| **Le corps** — 67 segments, 102 articulations, scan aux rayons X | **flybody**, Google DeepMind + HHMI Janelia |
 | **L'implémentation de référence** | [eonsystemspbc/fly-brain](https://github.com/eonsystemspbc/fly-brain) |
 
 Tous les neurones sont **identiques** : seul le câblage les différencie. Il n'y a
@@ -31,6 +32,13 @@ Ce n'est pas un « upload » : c'est un plan de câblage mis sous tension.
 
 ## Ce que l'application permet
 
+- **Une visite guidée en 9 étapes**, sans jargon, qui part de « voici une mouche » et
+  finit par ce que le modèle ne sait pas faire.
+- **Trois échelles** : la mouche entière, la tête, le cerveau. Le corps est rendu en
+  silhouette sombre translucide — on voit à travers où le cerveau est logé.
+- **Le corps bouge, piloté par les neurones** : MN9 déploie la trompe, aDN1 fait passer les
+  pattes avant sur les antennes, P9 lance la marche en trépied, la fibre géante ouvre les
+  ailes. Voir la mise en garde plus bas — c'est le point important.
 - **Naviguer** dans le volume : les deux lobes optiques, le cerveau central, les entrées
   sensorielles, chacun à sa place.
 - **Rejouer sept expériences** précalculées et regarder le signal se propager, neurone par
@@ -66,6 +74,33 @@ modèle n'est jamais « allumé » en entier — on regarde une voie précise s'
 
 ---
 
+## Le corps, et la mise en garde qui va avec
+
+Le corps vient de **flybody** (Google DeepMind + HHMI Janelia) : un modèle MuJoCo obtenu par
+tomographie aux rayons X d'une vraie mouche, avec 67 segments et 102 articulations. Le même
+modèle que celui utilisé par Eon.
+
+Le recalage cerveau ↔ corps n'a pas été fait à l'œil. Il est déduit de repères anatomiques :
+
+- **côté** — les neurones annotés `left` sont à x = −206 µm, ceux annotés `right` à +208 µm ;
+- **avant** — les neurones Or56a, dont les corps cellulaires sont dans l'antenne, sont à
+  z = −149 µm, l'extrême du volume.
+
+D'où le repère du cerveau (+x = droite, +y = dorsal, +z = postérieur), celui du corps
+(+x = avant, +y = gauche, +z = dorsal), et la transformation qui va de l'un à l'autre.
+
+**Ce qu'il faut comprendre du mouvement.** Le cerveau simulé ne calcule pas les mouvements.
+Il produit un taux de décharge sur une poignée de neurones descendants, et chaque taux
+déclenche ici une **animation écrite à la main**. C'est exactement ce que fait la démo
+d'Eon : 7 neurones descendants branchés sur des contrôleurs pré-entraînés, là où une vraie
+mouche en possède plus de 1 300. La raison est structurelle : FlyWire ne couvre que le
+cerveau, pas la chaîne nerveuse ventrale où siègent les motoneurones des pattes. Le modèle
+ne *peut pas* produire la marche.
+
+L'application le dit à l'écran plutôt que de le cacher — c'est le plus instructif.
+
+---
+
 ## Validation
 
 Le simulateur de ce dépôt (`pipeline/lif.py`, numpy) est une **réimplémentation
@@ -92,6 +127,7 @@ pip install -r pipeline/requirements.txt
 python pipeline/build_atlas.py    # -> web/data/positions.bin, attrs.bin, atlas.json…
 python pipeline/run_experiments.py # -> web/data/sims/*.bin
 python pipeline/build_edges.py    # -> web/data/graph.bin
+python pipeline/build_body.py     # -> web/data/body.bin  (corps, 4 Mo)
 python pipeline/validate.py       # contrôle contre les chiffres publiés d'Eon
 ```
 
@@ -144,12 +180,15 @@ pipeline/            reconstruction des données (Python)
   build_atlas.py       annotations + connectome -> binaires 3D
   run_experiments.py   lance les expériences -> trains de spikes
   build_edges.py       graphe élagué pour le navigateur + mesure du coût de l'élagage
+  build_body.py        modèle MuJoCo du corps -> maillages compacts + arbre articulé
   validate.py          contrôle contre les chiffres publiés d'Eon
 web/                 l'application (statique, sans étape de build)
   js/scene.js          rendu Three.js du nuage de points
+  js/fly-body.js       corps articulé, coque sombre translucide, recalage anatomique
+  js/motor.js          neurones descendants -> articulations (animations assumées)
   js/sim-worker.js     le même modèle LIF, en JavaScript, dans un Web Worker
   js/app.js            interface, lecture temporelle, sélection
-  data/                binaires générés (20 Mo)
+  data/                binaires générés (24 Mo)
 ```
 
 Le graphe expédié au navigateur est élagué à `|synapses| ≥ 5` : 2 700 513 connexions,
@@ -165,8 +204,9 @@ utilisent le **graphe complet**.
 - Modèle LIF : [Shiu et al., *Nature* 2024](https://www.nature.com/articles/s41586-024-07763-9)
 - Annotations : [Schlegel et al. 2024](https://github.com/flyconnectome/flywire_annotations)
 - Implémentation de référence : [eonsystemspbc/fly-brain](https://github.com/eonsystemspbc/fly-brain)
+- Corps : [flybody](https://github.com/eonsystemspbc/flybody), Google DeepMind + HHMI Janelia
 - Démo « mouche incarnée » : [Eon Systems](https://eon.systems/updates/embodied-brain-emulation) ·
   la lecture critique : [Carboncopies](https://carboncopies.org/Blog/Posts/FruitFlyNotUploaded/Post/)
 
 Le code de Shiu et al. repris dans `pipeline/` est sous licence MIT en amont ;
-Three.js (`web/vendor/`) est sous licence MIT.
+flybody est sous licence Apache 2.0 ; Three.js (`web/vendor/`) est sous licence MIT.

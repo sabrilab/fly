@@ -86,7 +86,7 @@ export class BrainScene {
 
     this.scene = new THREE.Scene();
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 1, 6000);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 1, 40000);
     this.camera.position.set(0, 55, 1180);
 
     this.controls = new OrbitControls(this.camera, canvas);
@@ -94,7 +94,7 @@ export class BrainScene {
     this.controls.dampingFactor = 0.07;
     this.controls.rotateSpeed = 0.62;
     this.controls.minDistance = 25;
-    this.controls.maxDistance = 2600;
+    this.controls.maxDistance = 14000;
     this.controls.autoRotateSpeed = 0.55;
 
     // ---- géométrie partagée ----
@@ -256,6 +256,21 @@ export class BrainScene {
   flyTo(target, distance) {
     this._fly = { from: this.controls.target.clone(), to: target.clone(),
                   fromPos: this.camera.position.clone(), dist: distance, t: 0 };
+  }
+
+  /** Va vers une pose de caméra donnée (position + cible). */
+  flyToPose(pos, target, instant) {
+    const p = new THREE.Vector3(pos[0], pos[1], pos[2]);
+    const t = new THREE.Vector3(target[0], target[1], target[2]);
+    if (instant) {
+      this.camera.position.copy(p);
+      this.controls.target.copy(t);
+      this.controls.update();
+      this._fly = null;
+      return;
+    }
+    this._fly = { from: this.controls.target.clone(), to: t,
+                  fromPos: this.camera.position.clone(), toPos: p, t: 0 };
   }
 
   setView(name) {

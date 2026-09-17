@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cerveau de drosophile</title>
-<meta name="description" content="Le connectome complet de la mouche du vinaigre en 3D, avec le modèle LIF de Shiu et al. exécutable dans le navigateur.">
+<title>Le cerveau d'une mouche</title>
+<meta name="description" content="Le cerveau entier d'une mouche du vinaigre, en 3D dans son corps, avec le modèle qui le fait fonctionner.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪰</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,8 +22,8 @@
 
 <div id="loader">
   <div class="loader-inner">
-    <div class="loader-title">Cerveau de drosophile</div>
-    <div class="loader-sub">138 639 neurones · connectome FlyWire v783</div>
+    <div class="loader-title">Le cerveau d'une mouche</div>
+    <div class="loader-sub">138 639 neurones · à leur vraie place, dans un vrai corps</div>
     <div class="loader-bar"><i id="loader-fill"></i></div>
     <div class="loader-step" id="loader-step">chargement…</div>
   </div>
@@ -35,11 +35,12 @@
   <div class="brand">
     <span class="brand-mark">🪰</span>
     <span class="brand-text">
-      <b>Cerveau de drosophile</b>
-      <i>connectome FlyWire v783 · modèle LIF de Shiu et al.</i>
+      <b>Le cerveau d'une mouche</b>
+      <i>connectome FlyWire · modèle de Shiu et al. · corps flybody</i>
     </span>
   </div>
   <div class="topbar-stats" id="topstats"></div>
+  <button id="btn-tour" class="ghost">Visite guidée</button>
   <button id="btn-about" class="ghost">À&nbsp;propos</button>
 </header>
 
@@ -48,28 +49,44 @@
   <div class="panel-scroll">
 
     <section>
-      <h2>Vue</h2>
+      <h2>Ce qu'on regarde</h2>
+      <div class="seg wide" id="viewmode" role="group" aria-label="Échelle">
+        <button data-vm="fly" class="on">La mouche</button>
+        <button data-vm="head">La tête</button>
+        <button data-vm="brain">Le cerveau</button>
+      </div>
+      <label class="ctl"><span>Transparence du corps</span>
+        <input type="range" id="bodyop" min="0" max="1.6" step="0.05" value="1"></label>
+      <p class="legend-hint">Le corps est un vrai scan aux rayons X. Il est rendu presque
+        transparent pour qu'on voie le cerveau logé dans la tête.</p>
+    </section>
+
+    <section>
+      <h2>Couleur des neurones</h2>
       <div class="seg" id="colormode" role="group" aria-label="Mode de coloration">
-        <button data-mode="anatomy" class="on">Anatomie</button>
-        <button data-mode="pathway">Voies</button>
+        <button data-mode="anatomy" class="on">Régions</button>
+        <button data-mode="pathway">Rôles</button>
         <button data-mode="nt">Chimie</button>
         <button data-mode="side">Côté</button>
       </div>
       <div class="legend" id="legend"></div>
-      <p class="legend-hint">Cliquez une entrée pour masquer ce groupe — masquer les lobes optiques dégage le cerveau central.</p>
-      <div class="row">
-        <label class="ctl"><span>Taille des points</span>
-          <input type="range" id="ptsize" min="0.4" max="4" step="0.1" value="1.9"></label>
-        <label class="ctl"><span>Densité</span>
-          <input type="range" id="ptalpha" min="0.03" max="0.7" step="0.01" value="0.34"></label>
-      </div>
-      <div class="views">
-        <button data-view="front">Face</button>
-        <button data-view="top">Dessus</button>
-        <button data-view="side">Profil</button>
-        <button data-view="reset">Recadrer</button>
-        <button data-view="spin" id="btn-spin">Rotation</button>
-      </div>
+      <p class="legend-hint" id="mode-note"></p>
+      <details class="adv">
+        <summary>Réglages fins</summary>
+        <div class="row">
+          <label class="ctl"><span>Taille des points</span>
+            <input type="range" id="ptsize" min="0.4" max="4" step="0.1" value="1.9"></label>
+          <label class="ctl"><span>Densité</span>
+            <input type="range" id="ptalpha" min="0.03" max="0.7" step="0.01" value="0.34"></label>
+        </div>
+        <div class="views">
+          <button data-view="front">Face</button>
+          <button data-view="top">Dessus</button>
+          <button data-view="side">Profil</button>
+          <button data-view="reset">Recadrer</button>
+          <button data-view="spin" id="btn-spin">Rotation</button>
+        </div>
+      </details>
     </section>
 
     <section>
@@ -94,28 +111,33 @@
       </div>
       <label class="ctl inline switch"><input type="checkbox" id="trail" checked>
         <span>Rémanence (traîne lumineuse)</span></label>
+      <label class="ctl inline switch"><input type="checkbox" id="animate" checked>
+        <span>Faire bouger le corps</span></label>
       <div class="raster-wrap">
         <canvas id="raster" height="132"></canvas>
-        <div class="raster-cap">Raster : un point par spike. Ordonnée = neurones, triés par latence de première décharge.</div>
+        <div class="raster-cap">Un point par décharge. En abscisse le temps, en ordonnée les
+          neurones, rangés par ordre d'entrée en action.</div>
       </div>
     </section>
 
     <section>
       <h2>Stimuler soi-même <span class="badge">live</span></h2>
-      <p class="note">Le modèle tourne dans votre navigateur, sur le graphe élagué (<span id="prune-note">—</span>). Choisissez une population, une fréquence, et regardez le signal se propager.</p>
+      <p class="note">Le modèle tourne dans votre navigateur. Choisissez ce qu'on allume,
+        à quelle intensité, et regardez le signal se propager pour de vrai.</p>
       <div class="live-grid">
-        <label class="ctl"><span>Population</span>
+        <label class="ctl"><span>On allume</span>
           <select id="live-input"></select></label>
-        <label class="ctl"><span>Fréquence</span>
+        <label class="ctl"><span>Intensité</span>
           <input type="number" id="live-hz" min="10" max="400" step="10" value="200"><i class="unit">Hz</i></label>
       </div>
-      <label class="ctl inline"><span>Éteindre (silencing)</span>
-        <select id="live-silence"><option value="">aucun</option></select></label>
+      <label class="ctl inline"><span>On éteint</span>
+        <select id="live-silence"><option value="">rien</option></select></label>
       <div class="transport">
-        <button id="btn-live" class="primary">▶ Lancer la simulation</button>
+        <button id="btn-live" class="primary">▶ Lancer</button>
         <button id="btn-live-stop" class="ghost" disabled>■</button>
       </div>
       <div class="live-stats" id="live-stats"></div>
+      <p class="legend-hint" id="prune-note"></p>
     </section>
 
   </div>
@@ -126,9 +148,20 @@
   <div class="panel-scroll">
 
     <section>
-      <h2>Sorties motrices</h2>
-      <p class="note">Les neurones descendants. Ce sont eux qui, dans la démo « mouche incarnée » d'Eon, déclenchent les contrôleurs du corps.</p>
+      <h2>Ce qui se passe</h2>
+      <div id="story" class="story"></div>
+    </section>
+
+    <section>
+      <h2>Les ordres envoyés au corps</h2>
+      <p class="note">Le cerveau ne commande pas les muscles directement. Il allume des
+        <b>neurones descendants</b> — une poignée de câbles qui descendent vers le corps.
+        Voici leur activité en direct.</p>
       <div id="readouts" class="readouts"></div>
+      <p class="caveat"><b>Attention.</b> Chacun de ces signaux déclenche ici une animation
+        écrite à la main. Le cerveau ne calcule pas le mouvement. C'est exactement la limite
+        de la démo d'Eon Systems : 7 neurones branchés sur des contrôleurs pré-entraînés,
+        là où une vraie mouche en a plus de 1 300.</p>
     </section>
 
     <section>
@@ -139,7 +172,7 @@
 
     <section>
       <h2>Rechercher</h2>
-      <input type="search" id="search" placeholder="type cellulaire : MN9, DNa02, LC4, aDN1…" autocomplete="off">
+      <input type="search" id="search" placeholder="MN9, DNa02, LC4, aDN1…" autocomplete="off">
       <div id="search-results" class="results"></div>
     </section>
 
@@ -149,26 +182,48 @@
 <button id="toggle-left"  class="edge-toggle left"  aria-label="Afficher/masquer le panneau gauche">‹</button>
 <button id="toggle-right" class="edge-toggle right" aria-label="Afficher/masquer le panneau droit">›</button>
 
-<div id="hint">glisser : orbiter · molette : zoomer · clic droit : déplacer · clic : sélectionner un neurone</div>
+<!-- bandeau de comportement -->
+<div id="behaviour"></div>
+
+<!-- visite guidée -->
+<div id="tour" hidden>
+  <div class="tour-card">
+    <div class="tour-progress"><i id="tour-fill"></i></div>
+    <div class="tour-step" id="tour-step"></div>
+    <h3 id="tour-title"></h3>
+    <p id="tour-body"></p>
+    <div class="tour-nav">
+      <button id="tour-prev" class="ghost">‹ Précédent</button>
+      <button id="tour-next" class="primary">Suivant ›</button>
+      <button id="tour-close" class="ghost close">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<div id="hint">glisser : tourner autour · molette : zoomer · clic : choisir un neurone</div>
 
 <dialog id="about">
-  <h3>De quoi s'agit-il ?</h3>
+  <h3>De quoi s'agit-il&nbsp;?</h3>
   <div class="about-body">
-    <p>Ceci est le <b>cerveau entier d'une mouche du vinaigre</b>, reconstruit neurone par neurone
-       à partir de microscopie électronique par le consortium <b>FlyWire</b> (Dorkenwald et al., <i>Nature</i> 2024),
-       puis rendu <b>simulable</b> par <b>Shiu et al.</b> (<i>Nature</i> 2024) — le modèle repris par
-       <b>Eon Systems</b> pour sa démo de « mouche incarnée » en mars 2026.</p>
-    <p>Chaque point est un neurone, placé à sa vraie position anatomique. Le modèle est
-       un <b>intègre-et-tire à fuite</b> : tous les neurones sont identiques, seul le câblage
-       les différencie, et il n'y a <b>qu'un seul paramètre libre</b> dans tout le système
-       (0,275&nbsp;mV par synapse).</p>
-    <p class="warn"><b>Ce que ce modèle n'est pas.</b> Pas de plasticité, pas d'apprentissage,
-       pas de neuromodulation, pas d'états internes. Aucun souvenir d'aucune mouche n'est
-       dedans. Ce n'est pas un « upload » : c'est un plan de câblage mis sous tension.</p>
+    <p>Trois choses réelles, assemblées ici&nbsp;:</p>
+    <p><b>Le cerveau.</b> Une vraie mouche a été découpée en milliers de tranches et
+       photographiée au microscope électronique. Le consortium <b>FlyWire</b> en a reconstruit
+       les 138&nbsp;639 neurones et les 15 millions de connexions (Dorkenwald et al., <i>Nature</i> 2024).
+       Chaque point à l'écran est un de ces neurones, à sa vraie place.</p>
+    <p><b>Le modèle.</b> <b>Shiu et al.</b> (<i>Nature</i> 2024) ont mis ce câblage sous tension&nbsp;:
+       tous les neurones sont identiques, seul le branchement les distingue, et il n'y a
+       <b>qu'un seul réglage libre</b> dans tout le système. C'est le modèle repris par
+       <b>Eon Systems</b> pour sa démo de « mouche incarnée » de mars 2026.</p>
+    <p><b>Le corps.</b> Le modèle <b>flybody</b> de Google DeepMind et HHMI Janelia, obtenu par
+       tomographie aux rayons X&nbsp;: 67 segments, 102 articulations.</p>
+    <p class="warn"><b>Ce que ce n'est pas.</b> Pas de mémoire, pas d'apprentissage, pas de
+       faim ni de fatigue. Aucun souvenir d'aucune mouche n'est là-dedans. Ce n'est pas une
+       mouche « téléversée » : c'est un plan de câblage qu'on met sous tension.</p>
     <p class="src">Sources · <a href="https://flywire.ai" target="_blank" rel="noopener">FlyWire</a> ·
        <a href="https://www.nature.com/articles/s41586-024-07763-9" target="_blank" rel="noopener">Shiu et al. 2024</a> ·
        <a href="https://github.com/eonsystemspbc/fly-brain" target="_blank" rel="noopener">code d'Eon Systems</a> ·
-       annotations de <a href="https://github.com/flyconnectome/flywire_annotations" target="_blank" rel="noopener">Schlegel et al. 2024</a></p>
+       <a href="https://github.com/eonsystemspbc/flybody" target="_blank" rel="noopener">flybody</a> ·
+       <a href="https://github.com/flyconnectome/flywire_annotations" target="_blank" rel="noopener">annotations</a></p>
   </div>
   <form method="dialog"><button class="primary">Fermer</button></form>
 </dialog>
