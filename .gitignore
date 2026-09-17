@@ -1,0 +1,12 @@
+# données brutes tierces, retéléchargeables (voir pipeline/fetch_data.sh)
+pipeline/raw/
+
+# environnements Python
+.venv/
+__pycache__/
+*.pyc
+
+# sorties intermédiaires
+*.log
+node_modules/
+.vercel/

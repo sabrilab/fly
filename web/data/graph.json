@@ -1,0 +1,1 @@
+{"n": 138639, "nnz": 2700513, "threshold": 5, "fullNnz": 15091983, "weightFraction": 0.6268, "offsets": {"indptr": 0, "indices": 554560, "weights": 11356612}, "fidelity": {"fullSpikes": 17485, "fullActive": 412, "prunedSpikes": 14925, "prunedActive": 375}, "degree": {"maxOut": 6399, "maxIn": 5080, "meanOut": 19.5}}
