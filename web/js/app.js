@@ -7,6 +7,7 @@ import { World, ARENA } from './world.js';
 import { PovView } from './pov.js';
 import { Sandbox, splitBySide } from './sandbox.js';
 import { Vision } from './vision.js';
+import { QUALITY, MOBILE, COARSE } from './env.js';
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) => n.toLocaleString('fr-FR');
@@ -36,7 +37,7 @@ const step = (msg, p) => { stepEl.textContent = msg; fillEl.style.width = (p * 1
     // le sol se place sous le point le plus bas du corps, pattes comprises
     scene.flyGroup.updateMatrixWorld(true);
     groundY = new THREE.Box3().setFromObject(body.root).min.y;
-    pov = new PovView(); window.__pov = pov;
+    pov = new PovView(QUALITY.povSize[0], QUALITY.povSize[1]); window.__pov = pov;
     window.__scene = scene; window.__body = body; window.__motor = motor;
     buildModes(); buildLegend(); buildExperiments(); buildReadouts(); buildLive(); buildStory();
     wireUI();
@@ -45,7 +46,7 @@ const step = (msg, p) => { stepEl.textContent = msg; fillEl.style.width = (p * 1
     step('prêt', 1);
     setTimeout(() => $('#loader').classList.add('done'), 260);
     setTimeout(() => $('#hint').classList.add('fade'), 9000);
-    if (!localStorage.getItem('tourSeen')) setTimeout(() => startTour(), 1100);
+    if (!localStorage.getItem('tourSeen') && !MOBILE) setTimeout(() => startTour(), 1100);
     tick();
   } catch (err) {
     stepEl.textContent = 'Erreur : ' + err.message;
@@ -68,6 +69,14 @@ async function setAppMode(name) {
   SANDBOX_ONLY.forEach((q) => { const e = $(q); if (e) e.hidden = !sandboxOn; });
   $('#povbox').hidden = !sandboxOn;
   $('#bubble').hidden = !sandboxOn;
+  const mbPov = document.querySelector('#mobilebar button[data-mb="pov"]');
+  if (mbPov) { mbPov.disabled = !sandboxOn; mbPov.classList.toggle('on', sandboxOn); }
+  $('#povbox').classList.remove('off');
+  document.querySelectorAll('.panel').forEach((p) => p.classList.remove('open'));
+  $('#scrim').classList.remove('on');
+  document.querySelectorAll('#mobilebar button').forEach((b) => {
+    if (b.dataset.mb === 'left' || b.dataset.mb === 'right') b.classList.remove('on');
+  });
   $('#behaviour').classList.toggle('on', false);
 
   const scroll = document.querySelector('#left .panel-scroll');
@@ -170,7 +179,8 @@ function setViewMode(name, instant) {
     .forEach((b) => b.classList.toggle('on', b.dataset.vm === name));
   if (appMode === 'sandbox') { camSnap = true; body.setOpacity(v.op); scene.setPointSize(v.size);
                                $('#bodyop').value = v.op; $('#ptsize').value = v.size; return; }
-  scene.flyToPose(v.pos, v.target, instant);
+  const pf = scene.portraitFactor || 1;
+  scene.flyToPose([v.pos[0] * pf, v.pos[1] * pf, v.pos[2] * pf], v.target, instant);
   $('#bodyop').value = v.op;
   body.setOpacity(v.op);
   scene.setPointSize(v.size);
@@ -570,8 +580,13 @@ function placeBubble() {
   if (p.z > 1) { el.hidden = true; return; }
   const x = (p.x * 0.5 + 0.5) * innerWidth;
   const y = (-p.y * 0.5 + 0.5) * innerHeight;
-  el.style.left = Math.max(180, Math.min(innerWidth - 180, x)) + 'px';
-  el.style.top = Math.max(120, y - 18) + 'px';
+  // on borne d'après la largeur réelle de la bulle : sur un écran étroit, une
+  // marge fixe la collait au centre et elle ne désignait plus la mouche
+  const bw = (el.offsetWidth || 260) / 2 + 10;
+  const top = 64 + (parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--safe-t')) || 0);
+  el.style.left = Math.max(bw, Math.min(innerWidth - bw, x)) + 'px';
+  el.style.top = Math.max(top, Math.min(innerHeight - 90, y - 18)) + 'px';
   el.hidden = false;
 }
 
@@ -790,6 +805,7 @@ async function nextTour(dir) {
 
 // ───────────────────────────────── boucle ─────────────────────────────────
 let last = performance.now(), storyClock = 0;
+let qAcc = 0, qN = 0, povFrame = 0;
 function tick() {
   requestAnimationFrame(tick);
   const now = performance.now();
@@ -814,7 +830,9 @@ function tick() {
     }
     motor.flight = { airborne: world.airborne, wingPhase: world.wingPhase };
     if ($('#sb-follow').checked) {
-      const [dist, h] = FOLLOW[viewMode] || FOLLOW.fly;
+      let [dist, h] = FOLLOW[viewMode] || FOLLOW.fly;
+      const pf = scene.portraitFactor || 1;        // écran étroit : on recule
+      dist *= pf; h *= pf;
       const def = [Math.sin(world.yaw) * dist, h, Math.cos(world.yaw) * dist];
       scene.follow(new THREE.Vector3(world.pos.x, world.pos.y, world.pos.z), dt, camSnap, def);
       camSnap = false;
@@ -903,8 +921,14 @@ function tick() {
 
   scene.render(dt);
 
-  // ce qu'elle voit : rendu après la scène, dans un coin de l'écran
-  if (pov && pov.enabled && appMode === 'sandbox') {
+  // ajustement automatique de la finesse, mesuré sur le débit réel
+  qAcc += rawDt; qN++;
+  if (qAcc > 1.6) { scene.adaptQuality(qAcc / qN); qAcc = 0; qN = 0; }
+
+  // ce qu'elle voit : sur téléphone, une image sur deux suffit et coûte moitié moins
+  povFrame++;
+  const povDue = !MOBILE || povFrame % 2 === 0;
+  if (povDue && pov && pov.enabled && appMode === 'sandbox' && !$('#povbox').classList.contains('off')) {
     const r = $('#pov-frame').getBoundingClientRect();
     if (r.width > 8) {
       // three.js applique lui-même le ratio de pixels : on donne des pixels CSS
@@ -1036,7 +1060,7 @@ function wireUI() {
 
   const tip = document.createElement('div'); tip.id = 'tip'; document.body.appendChild(tip);
   let tipRaf = 0;
-  canvas.addEventListener('pointermove', (e) => {
+  if (QUALITY.hover) canvas.addEventListener('pointermove', (e) => {
     if (tipRaf) return;
     tipRaf = requestAnimationFrame(() => {
       tipRaf = 0;
@@ -1051,16 +1075,44 @@ function wireUI() {
   });
 
   $('#btn-about').onclick = () => $('#about').showModal();
-  const mobile = matchMedia('(max-width: 820px)');
-  $('#toggle-left').onclick = () => {
-    const p = $('#left');
-    if (mobile.matches) p.classList.toggle('open');
-    else { p.classList.toggle('hide'); $('#toggle-left').classList.toggle('closed'); }
+
+  // ── panneaux : latéraux sur grand écran, feuilles coulissantes sur téléphone ──
+  const sheetMode = () => matchMedia('(max-width: 900px), (pointer: coarse) and (max-width: 1100px)').matches;
+
+  function openSheet(which) {
+    const L = $('#left'), R = $('#right');
+    const target = which === 'left' ? L : which === 'right' ? R : null;
+    const already = target && target.classList.contains('open');
+    L.classList.remove('open'); R.classList.remove('open');
+    if (target && !already) target.classList.add('open');
+    const open = L.classList.contains('open') || R.classList.contains('open');
+    $('#scrim').classList.toggle('on', open);
+    document.querySelectorAll('#mobilebar button[data-mb="left"], #mobilebar button[data-mb="right"]')
+      .forEach((b) => b.classList.toggle('on', open && b.dataset.mb === which && !already));
+  }
+
+  const togglePanel = (side) => {
+    if (sheetMode()) { openSheet(side); return; }
+    const p = $(side === 'left' ? '#left' : '#right');
+    p.classList.toggle('hide');
+    $(side === 'left' ? '#toggle-left' : '#toggle-right').classList.toggle('closed');
   };
-  $('#toggle-right').onclick = () => {
-    const p = $('#right');
-    if (mobile.matches) p.classList.toggle('open');
-    else { p.classList.toggle('hide'); $('#toggle-right').classList.toggle('closed'); }
+  $('#toggle-left').onclick = () => togglePanel('left');
+  $('#toggle-right').onclick = () => togglePanel('right');
+  $('#scrim').onclick = () => openSheet(null);
+
+  $('#mobilebar').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = b.dataset.mb;
+    if (k === 'left' || k === 'right') { openSheet(k); return; }
+    openSheet(null);
+    if (k === 'pov') {
+      const box = $('#povbox');
+      const off = box.classList.toggle('off');
+      b.classList.toggle('on', !off);
+    } else if (k === 'tour') {
+      startTour();
+    }
   };
 
   addEventListener('keydown', (e) => {

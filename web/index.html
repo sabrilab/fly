@@ -270,6 +270,15 @@
 <button id="toggle-left"  class="edge-toggle left"  aria-label="Afficher/masquer le panneau gauche">‹</button>
 <button id="toggle-right" class="edge-toggle right" aria-label="Afficher/masquer le panneau droit">›</button>
 
+<!-- barre d'onglets, téléphone uniquement -->
+<div id="scrim"></div>
+<nav id="mobilebar" aria-label="Navigation">
+  <button data-mb="left"><span>◳</span>Agir</button>
+  <button data-mb="right"><span>◉</span>Cerveau</button>
+  <button data-mb="pov"><span>◍</span>Sa vue</button>
+  <button data-mb="tour"><span>➜</span>Visite</button>
+</nav>
+
 <!-- bandeau de comportement -->
 <div id="behaviour"></div>
 
@@ -279,7 +288,8 @@
 <!-- ce qu'elle voit -->
 <div id="povbox" hidden>
   <div class="pov-frame" id="pov-frame"></div>
-  <div class="pov-cap">Ce qu'elle voit · ~750 facettes par œil · elle est presque aveugle au rouge
+  <div class="pov-cap"><span class="pov-long">Ce qu'elle voit · ~750 facettes par œil ·
+    elle est presque aveugle au rouge</span><span class="pov-short">Ce qu'elle voit</span>
     <button id="pov-big" class="pov-btn">agrandir</button></div>
 </div>
 

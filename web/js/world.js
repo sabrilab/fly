@@ -10,6 +10,7 @@
 //   • AJOUTÉ À LA MAIN : la traduction d'un taux de décharge en vitesse, en angle
 //     de virage ou en impulsion de saut. C'est la limite, la même que chez Eon.
 import * as THREE from 'three';
+import { QUALITY } from './env.js';
 
 // Le monde est en micromètres, comme le cerveau et le corps. La mouche fait 3 mm.
 export const ARENA = 165000;         // 165 mm de côté, ≈ 55 longueurs de mouche
@@ -97,7 +98,7 @@ export class World {
 
     // brins d'herbe : des repères verticaux. Ils donnent du relief à la scène et,
     // surtout, un défilement visible dans sa vision quand elle avance.
-    const N_STEMS = 900;
+    const N_STEMS = QUALITY.stems;
     const stemGeo = new THREE.CylinderGeometry(110, 230, 1, 5, 1, true);
     const stems = new THREE.InstancedMesh(
       stemGeo,
@@ -150,7 +151,7 @@ export class World {
   /** Cailloux : des obstacles solides, qu'elle doit contourner. */
   buildRocks() {
     const g = new THREE.Group();
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < QUALITY.rocks; i++) {
       const r = rnd(2600, 6200);
       const m = new THREE.Mesh(
         new THREE.DodecahedronGeometry(r, 0),

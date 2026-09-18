@@ -8,6 +8,7 @@
 //  antérieur : Or56a, dont les somas sont dans l'antenne, à z = −149 µm)
 // d'où  scène = (−corps_y, corps_z, −corps_x) + décalage tête→cerveau.
 import * as THREE from 'three';
+import { QUALITY } from './env.js';
 
 const HEAD_OFFSET = [-25.5, 16.5, 726];   // µm, aligne le centre de la tête sur celui du cerveau
 
@@ -118,7 +119,8 @@ export class FlyBody {
             uOpacity: { value: 1 },
           },
           vertexShader: VERT, fragmentShader: FRAG,
-          transparent: true, depthWrite: false, side: THREE.DoubleSide,
+          transparent: true, depthWrite: false,
+          side: QUALITY.bodyDoubleSided ? THREE.DoubleSide : THREE.FrontSide,
           blending: THREE.NormalBlending,
         });
         this.materials.push(mat);

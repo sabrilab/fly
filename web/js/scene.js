@@ -1,6 +1,7 @@
 // Scène Three.js : nuage de points des neurones, halo d'activité, connexions.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { QUALITY } from './env.js';
 
 const VERT = /* glsl */`
   attribute vec3  aColor;   // couleur catégorielle, calculée côté CPU
@@ -81,7 +82,7 @@ export class BrainScene {
     this.n = data.n;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY.pixelRatio));
     this.renderer.setClearColor(0x0c0c0d, 1);
 
     this.scene = new THREE.Scene();
@@ -178,13 +179,35 @@ export class BrainScene {
   resize() {
     const w = innerWidth, h = innerHeight;
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+    const aspect = w / h;
+    this.camera.aspect = aspect;
+    // On raisonne en champ HORIZONTAL constant. Sinon, sur un écran de téléphone
+    // tenu debout, le champ latéral s'effondre et la scène paraît collée au nez.
+    const BASE_V = 42, BASE_A = 1.6;
+    const hHalf = Math.atan(Math.tan((BASE_V * Math.PI) / 360) * BASE_A);
+    const v = (2 * Math.atan(Math.tan(hHalf) / Math.max(0.35, aspect)) * 180) / Math.PI;
+    this.camera.fov = Math.max(38, Math.min(70, v));
     this.camera.updateProjectionMatrix();
     const scale = h / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
+    this.portraitFactor = aspect < 1 ? 1 + (1 / aspect - 1) * 0.5 : 1;
     this.uniforms.uScale.value = scale;
     this.glowUniforms.uScale.value = scale;
     this.ringUniforms.uScale.value = scale;
     this._h = h; this._w = w;
+  }
+
+  /**
+   * Qualité adaptative : on mesure le temps d'image réel et on ajuste la densité
+   * de pixels. Impossible de deviner la puissance de l'appareil, autant la mesurer.
+   */
+  adaptQuality(avgDt) {
+    const cur = this.renderer.getPixelRatio();
+    const max = Math.min(devicePixelRatio, QUALITY.pixelRatio);
+    let next = cur;
+    if (avgDt > 0.048 && cur > 0.7) next = Math.max(0.7, cur - 0.25);
+    else if (avgDt < 0.019 && cur < max - 0.01) next = Math.min(max, cur + 0.25);
+    if (Math.abs(next - cur) > 0.01) { this.renderer.setPixelRatio(next); this.resize(); }
+    return next;
   }
 
   setColors(colorArray) { this.aColor.array.set(colorArray); this.aColor.needsUpdate = true; }

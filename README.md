@@ -214,6 +214,27 @@ processus de Poisson). Reproduire : `python pipeline/validate.py`.
 
 ---
 
+## Sur téléphone
+
+L'application s'adapte : les panneaux deviennent des feuilles coulissantes avec une barre
+d'onglets (Agir · Cerveau · Sa vue · Visite), la barre haute se réduit, les zones sûres de
+l'écran sont respectées, et les cibles tactiles font au moins 44 px.
+
+Côté rendu, trois choses changent automatiquement sur un appareil tactile : la densité de
+pixels est plafonnée, le décor est allégé (320 brins d'herbe au lieu de 900, 14 cailloux au
+lieu de 22), le corps n'est plus rendu sur ses deux faces, et la vue de son œil n'est calculée
+qu'une image sur deux. Le survol est désactivé — le pointage parcourt les 138 639 points, c'est
+trop cher au doigt.
+
+Surtout, la finesse **s'ajuste toute seule** : le temps d'image réel est mesuré en continu et la
+densité de pixels monte ou descend en conséquence. Aucune supposition sur la puissance de
+l'appareil.
+
+Le champ de vision est calculé à l'horizontale plutôt qu'à la verticale, sinon un écran tenu
+debout écrase la scène ; et la caméra recule proportionnellement en portrait.
+
+---
+
 ## Reproduire les données
 
 ```bash
