@@ -145,6 +145,19 @@
         <span>La caméra la suit</span></label>
       <label class="ctl"><span>Envie de bouger</span>
         <input type="range" id="sb-explore" min="0" max="1" step="0.05" value="0.35"></label>
+      <label class="ctl"><span>Brancher ses yeux <em class="lab">démonstration</em></span>
+        <input type="range" id="sb-vision" min="0" max="1.5" step="0.05" value="0"></label>
+      <div id="vision-note" class="caveat" hidden>
+        <b>Regardez ce qui se passe.</b> Son lobe optique s'allume : on passe de 1 000 à plus de
+        <b>30 000 neurones actifs</b>. Et pourtant, regardez ses neurones descendants — il ne s'y
+        passe <b>rien</b>. Le signal meurt avant d'arriver.<br><br>
+        Ce n'est pas un défaut de cette application. Chez une vraie mouche, les neurones visuels
+        précoces <b>ne produisent pas de décharges</b> : ils communiquent par potentiels gradués.
+        Un modèle à décharges ne peut structurellement pas les faire fonctionner. Et le L1, classé
+        glutamatergique, est traité comme <b>inhibiteur</b> : il éteint ce que le L2 allume.<br><br>
+        <b>C'est précisément pour cette raison qu'Eon a dû ajouter un second modèle, entièrement
+        séparé, rien que pour la vision.</b> Plus de la moitié de ce cerveau ne peut pas tourner ici.
+      </div>
       <p class="legend-hint">Son cerveau n'a <b>aucune activité spontanée</b> : sans cette
         impulsion ajoutée à la main, elle resterait immobile pour toujours. Elle est répartie
         inégalement entre son P9 gauche et son P9 droit — et le connectome en fait bien un
@@ -261,7 +274,7 @@
 <div id="behaviour"></div>
 
 <!-- ce que fait son cerveau, au-dessus de sa tête -->
-<div id="bubble" hidden><b id="bubble-line"></b><i id="bubble-sub"></i></div>
+<div id="bubble" hidden><span id="bubble-emo"></span><span class="bubble-txt"><b id="bubble-line"></b><i id="bubble-sub"></i></span></div>
 
 <!-- ce qu'elle voit -->
 <div id="povbox" hidden>

@@ -36,7 +36,7 @@ export class Sandbox {
     this.wall = 0;
     this.reaction = null;        // temps de réaction mesuré, en ms de cerveau
     this.loomStart = null;
-    this.narration = { line: '', sub: '', tone: 'calm', at: 0 };
+    this.narration = { line: '', sub: '', tone: 'calm', emoji: '', at: 0 };
   }
 
   reset() {
@@ -129,56 +129,65 @@ export class Sandbox {
     const sugar = Math.max(s.sugarL || 0, s.sugarR || 0);
     const bitter = Math.max(s.bitterL || 0, s.bitterR || 0);
     const jo = Math.max(s.joL || 0, s.joR || 0);
-    const set = (line, sub, tone) => { this.narration = { line, sub, tone, at: performance.now() }; };
+    // Les émojis ne sont pas des émotions — elle n'en a pas. Ce sont des raccourcis
+    // pour lire d'un coup d'œil l'état de son cerveau.
+    const set = (line, sub, tone, emoji) =>
+      { this.narration = { line, sub, tone, emoji, at: performance.now() }; };
 
     if (w.airborne && w.flightT > 0) {
       set('Je suis en l’air.',
           'vol : je zigzague, c’est ce qui me rend difficile à attraper' +
-          (this.reaction !== null ? ` · réaction mesurée : ${this.reaction} ms` : ''), 'alarm');
+          (this.reaction !== null ? ` · réaction mesurée : ${this.reaction} ms` : ''), 'alarm', '🪽');
     } else if (gf > 30) {
       set('Ma fibre géante vient de partir.',
-          `Giant Fiber ${Math.round(gf)} Hz — le neurone le plus rapide de ma tête. Je décolle.`, 'alarm');
+          `Giant Fiber ${Math.round(gf)} Hz — le neurone le plus rapide de ma tête. Je décolle.`,
+          'alarm', '⚡');
     } else if (loom > 60) {
       set(`Quelque chose grossit ${loomSide}.`,
           `mes LC4 déchargent à ${Math.round(loom)} Hz — ce sont des détecteurs d’expansion, ` +
-          'pas de distance', 'alarm');
+          'pas de distance', 'alarm', '👁️');
     } else if (jo > 120 && adn > 12) {
       set('On me touche l’antenne.',
-          `organe de Johnston à ${Math.round(jo)} Hz → aDN1 à ${Math.round(adn)} Hz : je me nettoie`, 'busy');
+          `organe de Johnston à ${Math.round(jo)} Hz → aDN1 à ${Math.round(adn)} Hz : je me nettoie`,
+          'busy', '🧼');
     } else if (jo > 120) {
       set('Je sens l’air bouger.',
           `organe de Johnston à ${Math.round(jo)} Hz — je perçois les variations de pression ` +
-          'avant même de voir quoi que ce soit', 'busy');
+          'avant même de voir quoi que ce soit', 'busy', '🌬️');
     } else if (bitter > 40) {
       if (mn9 < 12) {
         set('C’est amer. Je n’avale pas.',
             `MN9 est retombé à ${Math.round(mn9)} Hz. Ce blocage n’est écrit nulle part : ` +
-            'il sort de mon câblage', 'busy');
+            'il sort de mon câblage', 'busy', '🤢');
       } else {
         set('Il y a du sucre, mais aussi de l’amer.',
             `les deux voies se disputent : MN9 n’arrive qu’à ${Math.round(mn9)} Hz au lieu de 100`,
-            'busy');
+            'busy', '😖');
       }
     } else if (mn9 > 10) {
-      set('Du sucre.',
-          `MN9 à ${Math.round(mn9)} Hz : ma trompe se déploie`, 'good');
+      set('Du sucre.', `MN9 à ${Math.round(mn9)} Hz : ma trompe se déploie`, 'good', '🍯');
     } else if (sugar > 30) {
       set('Ma patte touche quelque chose de sucré.',
-          `${Math.round(sugar)} Hz sur mes capteurs gustatifs, le signal monte`, 'good');
+          `${Math.round(sugar)} Hz sur mes capteurs gustatifs, le signal monte`, 'good', '👅');
     } else if ((s.or56a || 0) > 40) {
       set('Ça sent le moisi.',
-          `Or56a à ${Math.round(s.or56a)} Hz → DNa02 à ${Math.round(dna)} Hz : je m’écarte`, 'busy');
+          `Or56a à ${Math.round(s.or56a)} Hz → DNa02 à ${Math.round(dna)} Hz : je m’écarte`,
+          'busy', '🤧');
+    } else if (w._bumped > 0) {
+      set('Je bute contre quelque chose.',
+          'rien dans mon cerveau ne me dit qu’il y a un obstacle : je n’ai pas de vision ' +
+          'exploitable dans ce modèle, je le découvre en le touchant', 'busy', '🪨');
     } else if (dna > 12 && p9 > 8) {
       set('Je tourne en marchant.',
-          `DNa à ${Math.round(dna)} Hz, P9 à ${Math.round(p9)} Hz`, 'calm');
+          `DNa à ${Math.round(dna)} Hz, P9 à ${Math.round(p9)} Hz`, 'calm', '↩️');
     } else if (p9 > 8) {
-      set('J’avance.', `P9 à ${Math.round(p9)} Hz — marche en trépied alterné`, 'calm');
+      set('J’avance.', `P9 à ${Math.round(p9)} Hz — marche en trépied alterné`, 'calm', '🚶');
     } else if (w.airborne) {
-      set('Je retombe.', 'les ailes ne portent plus, j’atterris', 'busy');
+      set('Je retombe.', 'les ailes ne portent plus, j’atterris', 'busy', '🪂');
     } else if (this.spikes === 0 || (!p9 && !mn9 && !adn && !gf)) {
       set('Rien n’entre. Je ne fais rien.',
           'mon cerveau n’a aucune activité spontanée : sans stimulus, il est parfaitement muet',
-          'quiet');
+          'quiet', '😴');
     }
     return this.narration;
   }

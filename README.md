@@ -79,6 +79,31 @@ Une incrustation montre la scène depuis sa tête, en très grand angle, ramené
 hexagonale des ommatidies (~750 par œil) et corrigée pour sa réponse spectrale : elle voit
 l'ultraviolet, le bleu et le vert, et elle est presque aveugle au rouge.
 
+### Ce que la vision révèle — et pourquoi plus de la moitié du cerveau ne tourne pas
+
+Le curseur **« brancher ses yeux »** injecte l'image de son propre œil dans ses cellules de
+lamina (L1/L2), de façon rétinotopique. Le résultat est spectaculaire et négatif :
+
+- son lobe optique s'allume, on passe de **1 000 à plus de 30 000 neurones actifs** ;
+- et **rien** n'arrive à ses neurones descendants.
+
+Vérifié hors navigateur, sur le **graphe complet** : stimuler les 3 288 cellules L1/L2 à 30 Hz
+pendant 0,4 s active **0 des 12 246 neurones T4/T5** et **aucun** descendant. Ce n'est donc pas
+un effet de l'élagage.
+
+Deux raisons, toutes deux structurelles :
+
+1. Chez la drosophile, les neurones visuels précoces — photorécepteurs, cellules monopolaires
+   de la lamina, une grande partie de la médulla — **ne produisent pas de potentiels d'action**.
+   Ils communiquent par potentiels gradués. Un modèle intègre-et-tire, qui ne transmet que des
+   décharges, ne peut pas les faire fonctionner.
+2. L1 est classé glutamatergique, donc **inhibiteur** dans ce modèle : son poids sortant total
+   est de **−427 370**, contre **+764 346** pour L2. L'un éteint ce que l'autre allume.
+
+**C'est exactement pour cette raison qu'Eon Systems a dû brancher un second modèle, entièrement
+séparé — le réseau de Lappalainen et al. — rien que pour la vision.** L'application le montre
+plutôt que de le masquer.
+
 ### La bulle au-dessus de sa tête
 
 Elle ne dit pas ce que la mouche « pense » — elle n'a rien à penser. Elle dit **ce que fait son
@@ -86,8 +111,17 @@ cerveau**, avec les chiffres réels : « mes LC4 déchargent à 210 Hz », « MN
 ce blocage n'est écrit nulle part ». Y compris quand il ne fait rien : *« Rien n'entre. Mon
 cerveau n'a aucune activité spontanée : sans stimulus, il est parfaitement muet. »*
 
+Chaque état porte aussi un émoji — 🚶 🍯 🤢 👁️ ⚡ 🪽 🧼 🪨 😴 — pour se lire d'un coup d'œil.
+Ce ne sont pas des émotions : elle n'en a pas. C'est l'état de son cerveau, résumé.
+
 C'est d'ailleurs pourquoi le bac à sable ajoute une **pulsion d'exploration** réglable : sans
 cette impulsion écrite à la main, la mouche resterait immobile pour toujours.
+
+### Le monde vit sans vous
+
+Prédateur actif d'emblée, rafales de vent qui secouent ses antennes, nourriture qui apparaît,
+22 cailloux qu'elle percute et contourne. Observée une minute sans la moindre intervention :
+**5 décollages**, des repas, des virages, des chocs, et un temps de réaction mesuré à 96 ms.
 
 ---
 

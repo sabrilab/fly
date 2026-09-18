@@ -425,3 +425,13 @@ details.adv > summary:hover { color: var(--text-secondary); }
   border-color: color-mix(in srgb, var(--cat-2) 58%, transparent); }
 .deeds button.flash { background: color-mix(in srgb, var(--cat-1) 30%, var(--surface-2));
   border-color: var(--cat-1); transition: background .35s, border-color .35s; }
+
+/* émoji d'état dans la bulle */
+#bubble { display: flex; align-items: flex-start; gap: 11px; }
+#bubble-emo { font-size: 26px; line-height: 1.1; flex: none; }
+#bubble-emo:empty { display: none; }
+.bubble-txt { min-width: 0; }
+.ctl .lab { font-style: normal; font: 500 9px var(--mono); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--cat-2); border: 1px solid color-mix(in srgb, var(--cat-2) 45%, transparent);
+  border-radius: 3px; padding: 2px 4px; margin-left: 6px; }
+#vision-note { margin-top: 10px; }

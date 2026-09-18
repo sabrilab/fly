@@ -56,8 +56,13 @@ export class World {
     // prétend pas latéraliser ce qui ne l'est pas.
     this.lateral = {};
     this.events = [];
+    this.rocks = [];
+    this.gust = 0;            // rafale en cours : intensité 0..1
+    this.gustT = rnd(6000, 14000);
+    this.cropT = rnd(9000, 20000);
 
     this.buildScenery();
+    this.buildRocks();
     this.buildGround();
   }
 
@@ -142,12 +147,39 @@ export class World {
     this.group.add(grid);
   }
 
+  /** Cailloux : des obstacles solides, qu'elle doit contourner. */
+  buildRocks() {
+    const g = new THREE.Group();
+    for (let i = 0; i < 22; i++) {
+      const r = rnd(2600, 6200);
+      const m = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(r, 0),
+        new THREE.MeshBasicMaterial({ color: 0x232a33, transparent: true, opacity: 0.95 }),
+      );
+      const rim = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(r * 1.03, 0),
+        new THREE.MeshBasicMaterial({ color: 0x5d6b7a, wireframe: true,
+                                      transparent: true, opacity: 0.16 }),
+      );
+      m.add(rim);
+      const a = rnd(0, Math.PI * 2), d = rnd(14000, ARENA * 0.44);
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      m.position.set(x, r * 0.45, z);
+      m.rotation.set(rnd(0, 3), rnd(0, 3), rnd(0, 3));
+      g.add(m);
+      this.rocks.push({ x, z, r: r * 0.8, mesh: m });
+    }
+    this.rockGroup = g;
+    this.group.add(g);
+  }
+
   setGroundY(y) {
     this.groundY = y;
     this.grid.position.y = y;
     this.disc.position.y = y - 12;
     this.sky.position.y = y;
     this.stems.position.y = y;
+    if (this.rockGroup) this.rockGroup.position.y = y;
     this.refreshHeights();
   }
 
@@ -243,6 +275,7 @@ export class World {
   }
 
   clear() {
+    this.gust = 0; this.gustT = rnd(5000, 13000); this.cropT = rnd(9000, 20000);
     for (const f of this.foods) this.group.remove(f.mesh);
     for (const t of this.threats) this.group.remove(t.mesh);
     for (const d of this.dust) this.group.remove(d.mesh);
@@ -323,6 +356,12 @@ export class World {
         r.joL = Math.max(r.joL, 300 * push * this.gain('jo', side, -1));
         r.joR = Math.max(r.joR, 300 * push * this.gain('jo', side, 1));
       }
+    }
+
+    // ── VENT : une rafale secoue ses antennes. Voie mécanique, qui fonctionne. ──
+    if (this.gust > 0.02) {
+      r.joL = Math.max(r.joL, 230 * this.gust);
+      r.joR = Math.max(r.joR, 230 * this.gust * rnd(0.7, 1));
     }
 
     // ── TOUCHER : un grain de poussière collé sur une antenne ───────────────
@@ -446,6 +485,23 @@ export class World {
       this.pitch += (0 - this.pitch) * clamp(dtMs / 120, 0, 1);
     }
 
+    // cailloux : elle ne les traverse pas, elle bute et glisse le long
+    if (!this.airborne) {
+      for (const k of this.rocks) {
+        const dx = this.pos.x - k.x, dz = this.pos.z - k.z;
+        const d = Math.hypot(dx, dz), min = k.r + 1400;
+        if (d < min && d > 1) {
+          this.pos.x = k.x + (dx / d) * min;
+          this.pos.z = k.z + (dz / d) * min;
+          const away = Math.atan2(-dx / d, -dz / d);
+          let diff = ((away - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+          this.yaw += clamp(diff, -1, 1) * 0.0075 * dtMs;   // vers le cap qui l'écarte
+          if (!this._bumped) { this._bumped = 600; this.events.push({ t: 'bump', at: performance.now() }); }
+        }
+      }
+      if (this._bumped > 0) this._bumped -= dtMs;
+    }
+
     // bord de l'arène : elle s'en détourne progressivement, bien avant la paroi,
     // au lieu de la longer indéfiniment
     const lim = ARENA / 2 - 4000;
@@ -491,6 +547,27 @@ export class World {
     // dérive lente de l'asymétrie d'exploration : un processus d'Ornstein-Uhlenbeck
     this.wander += (-this.wander * 0.0022 + (Math.random() - 0.5) * 0.05) * dtMs;
     this.wander = clamp(this.wander, -1, 1);
+
+    // ── LE MONDE VIT TOUT SEUL ─────────────────────────────────────────────
+    // rafales de vent : elles secouent ses antennes
+    this.gust *= Math.exp(-dtMs / 260);
+    this.gustT -= dtMs;
+    if (this.gustT <= 0) {
+      this.gust = rnd(0.5, 1);
+      this.gustT = rnd(5000, 13000);
+      this.events.push({ t: 'gust', at: performance.now() });
+    }
+    // de la nourriture apparaît de temps en temps, pas trop loin
+    this.cropT -= dtMs;
+    if (this.cropT <= 0) {
+      this.cropT = rnd(11000, 24000);
+      if (this.foods.length < 6) {
+        const a = rnd(0, Math.PI * 2), d = rnd(9000, 26000);
+        this.addFood(this.pos.x + Math.cos(a) * d, this.pos.z + Math.sin(a) * d,
+                     Math.random() < 0.75 ? 'sugar' : 'bitter');
+        this.events.push({ t: 'crop', at: performance.now() });
+      }
+    }
 
     // prédateur : des menaces reviennent d'elles-mêmes, pour qu'elle vole souvent
     if (this.predator) {

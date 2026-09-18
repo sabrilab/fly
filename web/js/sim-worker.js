@@ -27,7 +27,10 @@ function init(msg) {
   const pops = msg.pops || { main: msg.stim || [] };
   const all = [];
   for (const k in pops) for (const i of pops[k]) all.push(i);
-  const stim = Int32Array.from(new Set(all));
+  const popIdx = Int32Array.from(new Set(all));
+  // rétine : chaque cellule de lamina a son propre taux, mis à jour image par image
+  const retina = msg.retina ? new Uint32Array(msg.retina) : new Uint32Array(0);
+  const stim = Int32Array.from(new Set([...all, ...retina]));
   const silenced = new Uint8Array(n);
   for (const i of msg.silence || []) silenced[i] = 1;
 
@@ -36,7 +39,7 @@ function init(msg) {
   for (const i of stim) { rfcSteps[i] = 0; isStim[i] = 1; }
 
   S = {
-    n, stim, silenced, isStim, rfcSteps, pops,
+    n, stim, silenced, isStim, rfcSteps, pops, popIdx, retina,
     prob: (msg.hz || 0) * (DT / 1000),
     probs: new Float32Array(n),          // probabilité par neurone et par pas
     v: new Float32Array(n).fill(V_REST),
@@ -62,16 +65,24 @@ function init(msg) {
   for (const i of stim) wake(i);
 }
 
-/** Met à jour les taux de stimulation sans interrompre la simulation. */
+/** Met à jour les taux des populations, sans toucher à la rétine (ensembles disjoints). */
 function setRates(rates) {
   if (!S) return;
-  S.probs.fill(0);
+  for (let k = 0; k < S.popIdx.length; k++) S.probs[S.popIdx[k]] = 0;
   for (const k in S.pops) {
     const hz = rates[k] || 0;
     if (hz <= 0) continue;
     const p = hz * (DT / 1000);
     for (const i of S.pops[k]) S.probs[i] = Math.max(S.probs[i], p);
   }
+}
+
+/** Taux par neurone de lamina, déduits de l'image de son œil. */
+function setRetina(rates) {
+  if (!S || !S.retina.length) return;
+  const k0 = DT / 1000, ret = S.retina, probs = S.probs;
+  const n = Math.min(ret.length, rates.length);
+  for (let k = 0; k < n; k++) probs[ret[k]] = rates[k] * k0;
 }
 
 function wake(i) {
@@ -183,6 +194,8 @@ onmessage = (e) => {
     init(m); running = true; pending = 0; S.nFired = 0; loop();
   } else if (m.type === 'rates') {
     setRates(m.rates);
+  } else if (m.type === 'retina') {
+    setRetina(new Float32Array(m.rates));
   } else if (m.type === 'ack') {
     pending = Math.max(0, pending - m.count);
   } else if (m.type === 'stop') {

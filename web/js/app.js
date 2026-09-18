@@ -6,6 +6,7 @@ import { MotorController, BEHAVIOURS } from './motor.js';
 import { World, ARENA } from './world.js';
 import { PovView } from './pov.js';
 import { Sandbox, splitBySide } from './sandbox.js';
+import { Vision } from './vision.js';
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) => n.toLocaleString('fr-FR');
@@ -15,7 +16,7 @@ let D, scene, body = null, motor = null;
 let sim = null, graph = null, worker = null;
 let picked = -1, playing = false, frame = 0, acc = 0, live = null;
 let appMode = 'explore', world = null, sandbox = null, pov = null, groundY = -1250;
-let tool = 'sugar', camSnap = true;
+let tool = 'sugar', camSnap = true, vision = null, visionClock = 0;
 let glowList = new Int32Array(200000), glowCount = 0;
 let viewMode = 'fly';
 
@@ -92,6 +93,8 @@ async function enterSandbox() {
   }
   world.group.visible = true;
   window.__world = world;
+  world.predator = true;          // le monde vit sans qu'on ait à cliquer
+  world.predatorT = 6000;
   world.explore = +$('#sb-explore').value;
 
   pov.enabled = true;
@@ -117,12 +120,15 @@ async function enterSandbox() {
   ['sugar', 'bitter', 'jo', 'lc4', 'p9'].forEach(split);
   pops.or56a = D.sims.inputs.or56a.indices;
 
-  worker.postMessage({ type: 'start', pops,
+  if (!vision) { vision = new Vision(D); window.__vision = vision; }
+  const retina = vision.idx.slice();
+  worker.postMessage({ type: 'start', pops, retina: retina.buffer,
                        rates: { p9L: world.explore * 100, p9R: world.explore * 100 },
-                       watch: Object.values(D.sims.readoutIndices) });
+                       watch: Object.values(D.sims.readoutIndices) }, [retina.buffer]);
   camSnap = true;
   setViewMode('fly', true);
   buildCaps();
+  document.querySelector('#deeds button[data-do="predator"]').classList.add('on');
 }
 
 function exitSandbox() {
@@ -555,6 +561,7 @@ function placeBubble() {
   const el = $('#bubble');
   if (appMode !== 'sandbox' || !sandbox) { el.hidden = true; return; }
   const n = sandbox.narrate();
+  $('#bubble-emo').textContent = n.emoji || '';
   $('#bubble-line').textContent = n.line;
   $('#bubble-sub').textContent = n.sub;
   el.className = n.tone;
@@ -808,20 +815,41 @@ function tick() {
     motor.flight = { airborne: world.airborne, wingPhase: world.wingPhase };
     if ($('#sb-follow').checked) {
       const [dist, h] = FOLLOW[viewMode] || FOLLOW.fly;
-      scene.follow(new THREE.Vector3(world.pos.x, world.pos.y, world.pos.z),
-                   world.yaw, dist, h + world.pos.y * 0.25, dt, camSnap, world.airborne);
+      const def = [Math.sin(world.yaw) * dist, h, Math.cos(world.yaw) * dist];
+      scene.follow(new THREE.Vector3(world.pos.x, world.pos.y, world.pos.z), dt, camSnap, def);
       camSnap = false;
     }
     for (const ev of world.drainEvents()) {
-      if (ev.t === 'threat') flashHint('Une menace arrive.');
-      if (ev.t === 'takeoff') flashHint('Décollage.');
+      if (ev.t === 'threat') flashHint('⚠️ Une menace arrive.');
+      if (ev.t === 'takeoff') flashHint('⚡ Décollage.');
+      if (ev.t === 'gust') flashHint('🌬️ Une rafale de vent.');
+      if (ev.t === 'crop') flashHint('🍯 De la nourriture est apparue.');
     }
+    // ── VISION CONTINUE ───────────────────────────────────────────────────
+    // On lit l'image de son œil et on en injecte la variation de contraste dans
+    // ses cellules de lamina. Sans cela, ses 77 530 neurones visuels ne reçoivent
+    // rien et plus de la moitié de son cerveau reste éteinte.
+    visionClock += rawDt;
+    if (vision && pov.enabled && visionClock > 0.05) {
+      visionClock = 0;
+      const gain = +$('#sb-vision').value;
+      $('#vision-note').hidden = gain <= 0;
+      if (gain > 0) {
+        const rates = vision.update(scene.renderer, pov.target, gain);
+        if (rates) {
+          const copy = rates.slice();
+          worker.postMessage({ type: 'retina', rates: copy.buffer }, [copy.buffer]);
+        }
+      }
+    }
+
     updateCaps();
     if (used) {
       const speed = sandbox.wall ? (sandbox.brainMs / 1000 / sandbox.wall) : 0;
       $('#sb-stats').innerHTML =
         '<b>' + fmt(sandbox.brainMs) + '</b> ms vécues · <b>' + fmt(sandbox.spikes) +
-        '</b> décharges · <b>' + fmt(sandbox.awake || 0) + '</b> neurones éveillés<br>' +
+        '</b> décharges · <b>' + fmt(sandbox.awake || 0) + '</b> neurones éveillés · <b>' +
+        fmt(vision ? vision.count : 0) + '</b> cellules de lamina nourries<br>' +
         'temps mouche : <b>' + speed.toFixed(2) + '×</b> le temps réel' +
         (sandbox.reaction !== null
           ? ' · réaction mesurée : <b>' + sandbox.reaction + ' ms</b>' : '');

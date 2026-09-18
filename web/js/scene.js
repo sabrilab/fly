@@ -94,7 +94,7 @@ export class BrainScene {
     this.controls.dampingFactor = 0.07;
     this.controls.rotateSpeed = 0.62;
     this.controls.minDistance = 25;
-    this.controls.maxDistance = 14000;
+    this.controls.maxDistance = 220000;
     this.controls.autoRotateSpeed = 0.55;
 
     // ---- géométrie partagée ----
@@ -289,20 +289,23 @@ export class BrainScene {
                   toPos: new THREE.Vector3(p[0], p[1], p[2]), t: 0 };
   }
 
-  /** Suit la mouche : la caméra reste derrière elle, en douceur. */
-  follow(target, yaw, dist, height, dt, snap, fast) {
-    this._followFast = fast;
-    const wanted = new THREE.Vector3(
-      target.x + Math.sin(yaw) * dist,
-      target.y + height,
-      target.z + Math.cos(yaw) * dist,
-    );
+  /**
+   * Suit la mouche sans confisquer la caméra : on ne déplace que le point visé,
+   * et on conserve exactement l'écart choisi par l'utilisateur. Il garde donc la
+   * molette pour dézoomer et le glisser pour tourner autour d'elle.
+   */
+  follow(target, dt, snap, defaults) {
     const look = new THREE.Vector3(target.x, target.y + 900, target.z);
-    // en vol la mouche est rapide : la caméra doit se raidir pour ne pas la perdre
-    const agile = this._followFast ? 7.5 : 2.6;
-    const k = snap ? 1 : Math.min(1, dt * agile);
-    this.camera.position.lerp(wanted, k);
-    this.controls.target.lerp(look, snap ? 1 : Math.min(1, dt * agile * 1.8));
+    if (snap && defaults) {
+      this.controls.target.copy(look);
+      this.camera.position.set(look.x + defaults[0], look.y + defaults[1], look.z + defaults[2]);
+      this.controls.update();
+      this._fly = null;
+      return;
+    }
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    this.controls.target.lerp(look, Math.min(1, dt * 6.5));
+    this.camera.position.copy(this.controls.target).add(offset);
     this._fly = null;
   }
 
